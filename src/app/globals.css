@@ -31,7 +31,7 @@ body {
 }
 
 button, input { font: inherit; }
-button { cursor: pointer; border: 0; color: inherit; }
+button { cursor: pointer; border: 0; }
 input { color: inherit; }
 
 .ambient {
