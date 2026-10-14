@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import Image from "next/image";
+import { useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { Drawer } from "vaul";
 import {
-  ArrowLeft, BatteryFull, CalendarDays, Camera, Check, ChevronDown, ChevronRight,
-  Clock3, Copy, Crown, FileText, ImagePlus, Info, Link2, LocateFixed, MapPin,
-  Mic, Navigation, Phone, Plus, QrCode, Radio, Search, Share2, Signal,
-  Sparkles, Trash2, Users, Wifi, X,
+  BatteryFull, CalendarDays, Camera, Check, ChevronDown, ChevronRight,
+  Clock3, Crown, FileText, ImagePlus, Info, Link2, MapPin,
+  Mic, Navigation, Phone, Plus, Search, Share2, Signal,
+  Sparkles, Users, Wifi, X,
 } from "lucide-react";
 import {
   type Member, type Sheet, type Status, statusMeta, team, useEmbersStore,
@@ -23,7 +24,7 @@ function Press({ children, className, onClick, type = "button" }: {
 }
 
 function Asset({ src, className = "h-5 w-5" }: { src: string; className?: string }) {
-  return <img alt="" src={src} className={className} />;
+  return <Image alt="" src={src} width={48} height={48} className={className} />;
 }
 
 function StatusBar({ time = "9:41" }: { time?: string }) {
