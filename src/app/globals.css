@@ -1,9 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  --background: #080706;
-  --foreground: #f8f7f5;
-  --ember: #ff5a1f;
+  --background: #000000;
+  --foreground: #ffffff;
+  --ember: #ff6b00;
+  --sheet: #1c1c1e;
+  --elevated: #2c2c2e;
+  --secondary: #3a3a3e;
 }
 
 @theme inline {
@@ -17,7 +20,7 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-html { background: #080706; }
+html { background: #080402; }
 
 body {
   margin: 0;
@@ -28,7 +31,8 @@ body {
 }
 
 button, input { font: inherit; }
-button { cursor: pointer; }
+button { cursor: pointer; border: 0; color: inherit; }
+input { color: inherit; }
 
 .ambient {
   background:
@@ -56,6 +60,19 @@ button { cursor: pointer; }
 .safe-bottom { padding-bottom: max(20px, env(safe-area-inset-bottom)); }
 .tabular { font-variant-numeric: tabular-nums; }
 
+.figma-gradient {
+  background:
+    radial-gradient(circle at 16% 22%, rgba(255, 172, 86, .62), transparent 25%),
+    linear-gradient(180deg, #ff6b00 0%, #c42a1a 32%, #4b0f2c 66%, #0a0508 100%);
+}
+
+.hub-gradient {
+  background:
+    radial-gradient(circle at 110% 18%, rgba(255, 107, 0, .22), transparent 34%),
+    radial-gradient(circle at -10% 78%, rgba(75, 15, 44, .38), transparent 42%),
+    #000;
+}
+
 @keyframes pulse-ring {
   0%,100% { transform: scale(.82); opacity: .65; }
   50% { transform: scale(1.18); opacity: 0; }
@@ -64,9 +81,9 @@ button { cursor: pointer; }
 
 @media (min-width: 520px) {
   .phone-frame {
-    height: min(900px, calc(100dvh - 40px));
-    min-height: 700px;
-    border-radius: 48px;
+    height: min(852px, calc(100dvh - 32px));
+    min-height: min(852px, calc(100dvh - 32px));
+    border-radius: 46px;
     border: 1px solid rgba(255,255,255,.12);
     box-shadow: 0 40px 120px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.08);
   }
