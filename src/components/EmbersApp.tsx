@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import jsQR from "jsqr";
 import { AnimatePresence, LayoutGroup, Reorder, animate, motion, useDragControls, useMotionValue, useTransform } from "framer-motion";
@@ -13,8 +13,9 @@ import {
   Sparkles, Star, Trash2, Users, Warehouse, X,
 } from "lucide-react";
 import {
-  type LocationIcon, type Member, type ScheduleBlock, type Sheet, type Status, eventPlace, eventWhen, formatDateLabel, locationIconNames, presetColors, statusMeta, team, useEmbersStore,
+  type EventPhase, type EventRecord, type LocationIcon, type Member, type ProgramFile, type ScheduleBlock, type Sheet, type Status, archiveDaysLeft, blankDraft, eventPhase, eventPlace, eventWhen, eventWindow, focusedEvent, formatDateLabel, locationIconNames, presetColors, statusMeta, useEmbersStore,
 } from "@/store/useEmbersStore";
+import "mapbox-gl/dist/mapbox-gl.css";
 
 const spring = { type: "spring" as const, stiffness: 380, damping: 30, mass: 0.8 };
 const cn = (...v: Array<string | false | null | undefined>) => v.filter(Boolean).join(" ");
@@ -24,20 +25,22 @@ function LocationMark({ icon, color, size = 28 }: { icon?: string; color: string
   const Icon = locationIconMap[icon as LocationIcon] ?? Sparkles;
   return <span style={{ background: color, width: size, height: size, borderRadius: size >= 48 ? 16 : 8 }} className="grid shrink-0 place-items-center text-white"><Icon size={Math.round(size * 0.46)} /></span>;
 }
-const inviteUrl = "https://embers.app/j/K7Q2X9";
 const timezones = ["Москва", "Калининград", "Самара", "Екатеринбург", "Новосибирск", "Владивосток"];
+const emptyBlocks: ScheduleBlock[] = [];
+const emptyFiles: ProgramFile[] = [];
 
-async function shareInvite(title: string) {
+async function shareInvite(title: string, code: string) {
+  const url = `https://embers.app/j/${code}`;
   if (navigator.share) {
     try {
-      await navigator.share({ title, url: inviteUrl });
+      await navigator.share({ title, url });
       return "shared" as const;
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return "cancelled" as const;
     }
   }
   try {
-    await navigator.clipboard.writeText(inviteUrl);
+    await navigator.clipboard.writeText(url);
     return "copied" as const;
   } catch {
     return "failed" as const;
@@ -140,12 +143,27 @@ function AuthScreen() {
   </div>;
 }
 
+function useBoardEvents() {
+  const events = useEmbersStore((s) => s.events);
+  const now = useClock();
+  const time = now.getTime();
+  return events
+    .filter((event) => event.archivedAt == null && eventPhase(event.details, time) !== "past")
+    .sort((left, right) => {
+      const live = Number(eventPhase(right.details, time) === "live") - Number(eventPhase(left.details, time) === "live");
+      if (live) return live;
+      const start = (eventWindow(left.details)?.start ?? Number.MAX_SAFE_INTEGER) - (eventWindow(right.details)?.start ?? Number.MAX_SAFE_INTEGER);
+      if (start) return start;
+      return left.details.title.localeCompare(right.details.title, "ru");
+    });
+}
+
 function HubHeader() {
   const setScreen = useEmbersStore((s) => s.setScreen);
   const startCreate = useEmbersStore((s) => s.startCreate);
   const open = useEmbersStore((s) => s.openSheet);
-  const has = useEmbersStore((s) => s.hasEvents);
-  const event = useEmbersStore((s) => s.event);
+  const events = useBoardEvents();
+  const selectEvent = useEmbersStore((s) => s.selectEvent);
   const [menu, setMenu] = useState(false);
   return <div className="absolute inset-x-5 top-10 z-20 flex h-11 items-center">
     <button onClick={() => setMenu((value) => !value)} className="flex items-center text-left" aria-expanded={menu}>
@@ -156,13 +174,13 @@ function HubHeader() {
       <CircleButton onClick={startCreate} label="Новое событие"><Plus size={22} /></CircleButton>
       <button onClick={() => open("account")} aria-label="Аккаунт" className="grid h-11 w-11 place-items-center rounded-full bg-[#9c613d] text-base font-semibold">ВФ</button>
     </div>
-    {menu && <div className="absolute left-0 top-14 w-64 overflow-hidden rounded-2xl bg-[#2c2c2e] shadow-2xl">
-      {has ? <button onClick={() => setScreen("live")} className="flex h-14 w-full items-center px-4 text-left text-[17px]">{event.title}</button> : <p className="px-4 py-4 text-[15px] text-white/60">Пока нет событий</p>}
+    {menu && <div className="absolute left-0 top-14 max-h-80 w-64 overflow-y-auto rounded-2xl bg-[#2c2c2e] shadow-2xl">
+      {events.length ? events.map((item) => <button key={item.id} onClick={() => { selectEvent(item.id); setMenu(false); setScreen("live"); }} className="flex h-14 w-full items-center px-4 text-left text-[17px]">{item.details.title || "Без названия"}</button>) : <p className="px-4 py-4 text-[15px] text-white/60">Нет текущих событий</p>}
     </div>}
   </div>;
 }
 
-function EmptyHub() {
+function EmptyHub({ archived }: { archived: boolean }) {
   const open = useEmbersStore((s) => s.openSheet);
   const startCreate = useEmbersStore((s) => s.startCreate);
   return <div data-node-id="2:57">
@@ -170,8 +188,8 @@ function EmptyHub() {
     <div className="absolute left-[38px] right-[38px] top-[120px] h-10 rounded-[30px] bg-white/[.07]" />
     <div className="absolute inset-x-5 top-[136px] flex h-[330px] flex-col items-center rounded-[32px] border border-white/[.08] bg-white/10 text-center">
       <span className="mt-[34px] grid h-[104px] w-[104px] place-items-center rounded-full bg-orange-500/25"><CalendarDays size={48} className="text-[#ff6b00]" /></span>
-      <h2 className="mt-6 text-[26px] font-bold">Пока нет событий</h2>
-      <p className="mt-2 px-5 text-[15px] leading-5 text-[#ebebf599]">Создайте событие и пригласите команду<br />или присоединитесь по ссылке<br />от организатора</p>
+      <h2 className="mt-6 text-[26px] font-bold">{archived ? "События в архиве" : "Пока нет событий"}</h2>
+      <p className="mt-2 px-5 text-[15px] leading-5 text-[#ebebf599]">{archived ? <>Прошедшие события лежат в настройках<br />и хранятся там 7 дней</> : <>Создайте событие и пригласите команду<br />или присоединитесь по ссылке<br />от организатора</>}</p>
     </div>
     <div className="absolute inset-x-5 top-[516px] space-y-3">
       <Press onClick={startCreate} className="flex h-[54px] w-full items-center justify-center gap-2 rounded-full bg-[#ff6b00] text-[17px] font-semibold"><Plus size={18} />Создать событие</Press>
@@ -180,15 +198,45 @@ function EmptyHub() {
   </div>;
 }
 
-function EventCard() {
-  const setScreen = useEmbersStore((s) => s.setScreen);
-  const event = useEmbersStore((s) => s.event);
-  return <motion.button layoutId="event-card" onClick={() => setScreen("live")} whileTap={{ scale: .98 }} transition={spring} className="absolute inset-x-5 top-[104px] bottom-[52px] overflow-hidden rounded-[36px] bg-gradient-to-b from-[#ff8a1f] via-[#d2321c] via-45% to-[#3b0b22] text-center shadow-2xl">
+const cardGap = 16;
+const deleteReveal = 112;
+
+function rubberShift(value: number, min: number, max: number, size: number) {
+  if (value < min) {
+    const over = min - value;
+    return min - (over * size) / (over + size * 0.55);
+  }
+  if (value > max) {
+    const over = value - max;
+    return max + (over * size) / (over + size * 0.55);
+  }
+  return value;
+}
+
+function ruDays(count: number) {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  const word = mod10 === 1 && mod100 !== 11 ? "день" : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? "дня" : "дней";
+  return `${count} ${word}`;
+}
+
+function EventStatusBadge({ phase, size = "card" }: { phase: EventPhase; size?: "card" | "board" }) {
+  const box = size === "card" ? "h-8 gap-1.5 px-3 text-[13px]" : "h-[30px] gap-1 px-3 text-[11px]";
+  const label = phase === "live" ? "LIVE" : phase === "upcoming" ? "СКОРО" : "ПРОШЛО";
+  const dot = phase === "live" ? "bg-red-500" : phase === "upcoming" ? "bg-[#ffd60a]" : "bg-white/45";
+  return <span className={cn("inline-flex items-center rounded-full bg-black/30 font-bold", box, phase === "past" && "text-white/80")}><i className={cn("h-2 w-2 rounded-full", dot)} />{label}</span>;
+}
+
+function EventCard({ record, onOpen }: { record: EventRecord; onOpen: () => void }) {
+  const now = useClock();
+  const event = record.details;
+  const team = record.team;
+  return <motion.button type="button" onClick={onOpen} whileTap={{ scale: .98 }} transition={spring} className="relative h-full w-full overflow-hidden rounded-[36px] bg-gradient-to-b from-[#ff8a1f] via-[#d2321c] via-45% to-[#3b0b22] text-center shadow-2xl">
     {event.cover && <span className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${event.cover})` }} />}
     <div className="absolute -left-16 top-10 h-[300px] w-[300px] rounded-full bg-[radial-gradient(circle_at_35%_30%,#ffd18b_0%,#ff7a1c_35%,transparent_68%)] opacity-90 blur-sm" />
     <div className="absolute inset-x-0 bottom-0 h-80 bg-gradient-to-b from-transparent to-black/55" />
     <span className="absolute left-4 top-4 flex h-8 items-center gap-1.5 rounded-full bg-white/20 px-3 text-[13px] font-semibold"><Asset src="/figma-crown.svg" className="h-3.5 w-3.5" />Организатор</span>
-    <span className="absolute right-4 top-4 flex h-8 items-center gap-1.5 rounded-full bg-black/30 px-3 text-[13px] font-bold"><i className="h-2 w-2 rounded-full bg-red-500" />LIVE</span>
+    <span className="absolute right-4 top-4"><EventStatusBadge phase={eventPhase(event, now.getTime())} /></span>
     <div className="absolute inset-x-0 bottom-8 flex flex-col items-center">
       <div className="flex justify-center -space-x-2">{team.slice(0, 4).map((m) => <Avatar key={m.id} member={m} size={36} />)}</div>
       <h2 className="mt-4 text-[34px] font-extrabold tracking-tight">{event.title}</h2>
@@ -200,33 +248,302 @@ function EventCard() {
   </motion.button>;
 }
 
+function EventPager() {
+  const events = useBoardEvents();
+  const activeId = useEmbersStore((s) => s.activeEventId);
+  const selectEvent = useEmbersStore((s) => s.selectEvent);
+  const archiveEvent = useEmbersStore((s) => s.archiveEvent);
+  const deleteEvent = useEmbersStore((s) => s.deleteEvent);
+  const setScreen = useEmbersStore((s) => s.setScreen);
+  const index = Math.max(0, events.findIndex((item) => item.id === activeId));
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  const [deleteReady, setDeleteReady] = useState(false);
+  const x = useMotionValue(0);
+  const lift = useMotionValue(0);
+  const archiveOpacity = useTransform(lift, [28, 120], [0, 1]);
+  const deleteOpacity = useTransform(lift, [-24, -deleteReveal], [0, 1]);
+  const dragging = useRef(false);
+  const placed = useRef(false);
+  const suppressClick = useRef(false);
+  const deleteOpen = useRef(false);
+  const busy = useRef(false);
+  const motionControl = useRef<{ stop: () => void } | null>(null);
+  const stride = width + cardGap;
+
+  useLayoutEffect(() => {
+    const node = frameRef.current;
+    if (!node) return;
+    const measure = () => setWidth(node.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!width || dragging.current) return;
+    const target = -index * stride;
+    if (!placed.current) {
+      x.set(target);
+      placed.current = true;
+      return;
+    }
+    const animation = animate(x, target, spring);
+    return () => animation.stop();
+  }, [index, stride, width, x]);
+
+  useLayoutEffect(() => {
+    lift.set(0);
+    deleteOpen.current = false;
+    setDeleteReady(false);
+  }, [activeId, lift]);
+
+  const settleDelete = (open: boolean) => {
+    deleteOpen.current = open;
+    setDeleteReady(open);
+    motionControl.current?.stop();
+    motionControl.current = animate(lift, open ? -deleteReveal : 0, spring);
+  };
+
+  const openCard = (id: string) => {
+    if (suppressClick.current) {
+      suppressClick.current = false;
+      return;
+    }
+    if (deleteOpen.current) {
+      settleDelete(false);
+      return;
+    }
+    selectEvent(id);
+    setScreen("live");
+  };
+
+  const finishVertical = (id: string, velocity: number) => {
+    const value = lift.get();
+    if (value > 88 || (value > 36 && velocity > 900)) {
+      busy.current = true;
+      motionControl.current?.stop();
+      const animation = animate(lift, 560, { duration: 0.26, ease: [0.4, 0, 1, 1] });
+      motionControl.current = animation;
+      void animation.finished.then(() => {
+        busy.current = false;
+        archiveEvent(id);
+      });
+      return;
+    }
+    if (value < -56 || (value < -28 && velocity < -700)) {
+      settleDelete(true);
+      return;
+    }
+    settleDelete(false);
+  };
+
+  const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || busy.current || !width) return;
+    suppressClick.current = false;
+    motionControl.current?.stop();
+    const pointerId = event.pointerId;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const originX = x.get();
+    const originY = lift.get();
+    const minX = -Math.max(0, events.length - 1) * stride;
+    let locked: "x" | "y" | null = null;
+    let lastX = startX;
+    let lastY = startY;
+    let lastTime = performance.now();
+    let velocityX = 0;
+    let velocityY = 0;
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+      const now = performance.now();
+      const dt = now - lastTime;
+      if (dt > 0) {
+        velocityX = ((ev.clientX - lastX) / dt) * 1000;
+        velocityY = ((ev.clientY - lastY) / dt) * 1000;
+      }
+      lastX = ev.clientX;
+      lastY = ev.clientY;
+      lastTime = now;
+      if (!locked && Math.hypot(dx, dy) > 8) {
+        locked = Math.abs(dy) > Math.abs(dx) ? "y" : "x";
+        dragging.current = true;
+        suppressClick.current = true;
+      }
+      if (locked === "x" && events.length > 1 && !deleteOpen.current) {
+        x.set(rubberShift(originX + dx, minX, 0, width));
+      }
+      if (locked === "y") {
+        ev.preventDefault();
+        const raw = originY + dy;
+        lift.set(raw <= 0 ? rubberShift(raw, -deleteReveal, 0, 160) : rubberShift(raw, 0, 240, 160));
+      }
+    };
+    const up = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      dragging.current = false;
+      if (locked === "x") {
+        if (deleteOpen.current) {
+          settleDelete(false);
+          return;
+        }
+        x.stop();
+        const nudge = Math.max(-stride, Math.min(stride, velocityX * 0.12));
+        const next = Math.max(0, Math.min(events.length - 1, Math.round(-(x.get() + nudge) / stride)));
+        if (events[next]?.id !== activeId) selectEvent(events[next].id);
+        else void animate(x, -index * stride, spring);
+      }
+      if (locked === "y") finishVertical(activeId, velocityY);
+    };
+    window.addEventListener("pointermove", move, { passive: false });
+    window.addEventListener("pointerup", up);
+  };
+
+  return <div ref={frameRef} onPointerDown={onPointerDown} className="absolute inset-x-5 top-[104px] bottom-[52px] touch-none overflow-hidden">
+    {width > 0 && <motion.div className="flex h-full" style={{ x, gap: cardGap }}>
+      {events.map((item) => <div key={item.id} className="relative h-full shrink-0" style={{ width }} inert={item.id !== activeId}>
+        {item.id === activeId && <>
+          <motion.div style={{ opacity: archiveOpacity }} className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
+            <span className="rounded-full bg-white/15 px-4 py-2 text-[15px] font-semibold">В архив</span>
+          </motion.div>
+          <motion.div style={{ opacity: deleteOpacity }} className="absolute inset-x-0 bottom-3 flex justify-center">
+            <button type="button" onPointerDown={(pointer) => pointer.stopPropagation()} onClick={() => {
+              busy.current = true;
+              motionControl.current?.stop();
+              const animation = animate(lift, -560, { duration: 0.22, ease: [0.4, 0, 1, 1] });
+              motionControl.current = animation;
+              void animation.finished.then(() => { busy.current = false; deleteEvent(item.id); });
+            }} className={cn("flex h-12 items-center gap-2 rounded-full bg-[#ff3b30] px-5 text-[16px] font-semibold shadow-[0_10px_24px_rgba(255,59,48,.35)]", !deleteReady && "pointer-events-none")}>
+              <Trash2 size={18} />Удалить
+            </button>
+          </motion.div>
+        </>}
+        <motion.div className="relative z-10 h-full" style={{ y: item.id === activeId ? lift : 0 }}>
+          <EventCard record={item} onOpen={() => openCard(item.id)} />
+        </motion.div>
+      </div>)}
+    </motion.div>}
+  </div>;
+}
+
 function EventsHub() {
-  const has = useEmbersStore((s) => s.hasEvents);
-  const toggle = useEmbersStore((s) => s.setHasEvents);
-  return <div className="hub-gradient absolute inset-0 overflow-hidden" data-node-id={has ? "2:131" : "2:57"}>
-    <HubHeader />{has ? <EventCard /> : <EmptyHub />}
-    {has && <div className="absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 gap-2">
-      <button onClick={() => toggle(false)} aria-label="Пустой список" className="h-2 w-2 rounded-full bg-white" />
-      <i className="h-2 w-2 rounded-full bg-white/30" />
-      <i className="h-2 w-2 rounded-full bg-white/30" />
+  const events = useEmbersStore((s) => s.events);
+  const board = useBoardEvents();
+  const activeId = useEmbersStore((s) => s.activeEventId);
+  const selectEvent = useEmbersStore((s) => s.selectEvent);
+  const boardKey = board.map((event) => event.id).join("\0");
+  useEffect(() => {
+    const ids = boardKey ? boardKey.split("\0") : [];
+    if (!ids.length || ids.includes(activeId)) return;
+    selectEvent(ids[0]);
+  }, [activeId, boardKey, selectEvent]);
+  return <div className="hub-gradient absolute inset-0 overflow-hidden" data-node-id={board.length ? "2:131" : "2:57"}>
+    <HubHeader />{board.length ? <EventPager /> : <EmptyHub archived={events.length > 0} />}
+    {board.length > 1 && <div className="absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 gap-2">
+      {board.map((item) => <button key={item.id} aria-label={item.details.title} onClick={() => selectEvent(item.id)} className={cn("h-2 w-2 rounded-full", item.id === activeId ? "bg-white" : "bg-white/30")} />)}
     </div>}
   </div>;
+}
+
+function placeMark() {
+  const mark = document.createElement("div");
+  mark.style.cssText = "display:grid;width:22px;height:22px;place-items:center;border-radius:999px;border:3px solid #fff;background:#ff6b00;box-shadow:0 1px 4px rgba(0,0,0,.28)";
+  const dot = document.createElement("span");
+  dot.style.cssText = "width:6px;height:6px;border-radius:999px;background:#fff";
+  mark.append(dot);
+  return mark;
+}
+
+function LocationMap({ lat, lng }: { lat: number; lng: number }) {
+  const nodeRef = useRef<HTMLDivElement>(null);
+  const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+  const [expanded, setExpanded] = useState(false);
+  const [frame, setFrame] = useState<HTMLElement | null>(null);
+  useEffect(() => { setFrame(document.querySelector<HTMLElement>(".phone-frame")); }, []);
+  useEffect(() => {
+    const node = nodeRef.current;
+    if (!node || !token) return;
+    let map: { remove: () => void } | undefined;
+    let alive = true;
+    void import("mapbox-gl").then((mod) => {
+      if (!alive || !node.isConnected) return;
+      const mapboxgl = mod.default;
+      mapboxgl.accessToken = token;
+      const instance = new mapboxgl.Map({
+        container: node,
+        style: "mapbox://styles/therealvadim/cmv9jobw2013801sgcb182g5m",
+        center: [lng, lat],
+        zoom: expanded ? 16.4 : 15.6,
+        pitch: 62,
+        bearing: -24,
+        antialias: true,
+        cooperativeGestures: !expanded,
+      });
+      instance.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
+      new mapboxgl.Marker({ element: placeMark(), anchor: "center" }).setLngLat([lng, lat]).addTo(instance);
+      instance.once("style.load", () => {
+        if (!alive) return;
+        try { instance.setConfigProperty("basemap", "show3dObjects", true); } catch { /* стиль без конфигурации standard */ }
+        const hasExtrusion = (instance.getStyle()?.layers ?? []).some((layer) => layer.type === "fill-extrusion");
+        if (!hasExtrusion && instance.getSource("composite")) {
+          instance.addLayer({
+            id: "embers-buildings",
+            source: "composite",
+            "source-layer": "building",
+            filter: ["==", ["get", "extrude"], "true"],
+            type: "fill-extrusion",
+            minzoom: 14,
+            paint: {
+              "fill-extrusion-color": "#e7e2dc",
+              "fill-extrusion-height": ["interpolate", ["linear"], ["zoom"], 14, 0, 15.2, ["get", "height"]],
+              "fill-extrusion-base": ["coalesce", ["get", "min_height"], 0],
+              "fill-extrusion-opacity": 0.9,
+            },
+          });
+        }
+      });
+      if (!alive) {
+        instance.remove();
+        return;
+      }
+      map = instance;
+    });
+    return () => {
+      alive = false;
+      map?.remove();
+    };
+  }, [expanded, lat, lng, token]);
+  if (!token) return <div className="mt-4 grid h-52 place-items-center rounded-[22px] bg-black/30 px-6 text-center text-[13px] leading-5 text-white/50">Добавьте ключ Mapbox, чтобы показать карту</div>;
+  const view = <div className={expanded ? "absolute inset-0 z-40 bg-[#111]" : "relative h-full w-full"}>
+    <div ref={nodeRef} className="h-full w-full" />
+    {expanded
+      ? <button type="button" aria-label="Закрыть карту" onClick={() => setExpanded(false)} className="absolute left-5 top-10 z-20 grid h-11 w-11 place-items-center rounded-full bg-black/55 text-white backdrop-blur-xl"><X size={20} /></button>
+      : <button type="button" aria-label="Открыть карту" onClick={() => setExpanded(true)} className="absolute inset-0 z-10" />}
+  </div>;
+  return <>
+    <div className="relative mt-4 h-52 overflow-hidden rounded-[22px]">{expanded ? null : view}</div>
+    {expanded && frame ? createPortal(view, frame) : null}
+  </>;
 }
 
 function CreateEvent() {
   const setScreen = useEmbersStore((s) => s.setScreen);
   const open = useEmbersStore((s) => s.openSheet);
-  const draft = useEmbersStore((s) => s.draft);
+  const draft = useEmbersStore((s) => s.draftEvent?.details ?? blankDraft);
   const updateDraft = useEmbersStore((s) => s.updateDraft);
   const createEvent = useEmbersStore((s) => s.createEvent);
-  const files = useEmbersStore((s) => s.programFiles);
+  const files = useEmbersStore((s) => s.draftEvent?.programFiles ?? emptyFiles);
   const coverRef = useRef<HTMLInputElement>(null);
   const [showMap, setShowMap] = useState(true);
-  const [placeTitle, ...placeRest] = draft.venue.split(",").map((part) => part.trim()).filter(Boolean);
-  const placeDetail = [placeRest.join(", "), draft.zone].filter(Boolean).join(" · ");
-  const mapSrc = draft.lat != null && draft.lng != null
-    ? `https://www.openstreetmap.org/export/embed.html?bbox=${draft.lng - 0.01}%2C${draft.lat - 0.008}%2C${draft.lng + 0.01}%2C${draft.lat + 0.008}&layer=mapnik&marker=${draft.lat}%2C${draft.lng}`
-    : "";
+  const placeName = draft.zone.trim();
+  const [addressTitle, ...addressRest] = draft.venue.split(",").map((part) => part.trim()).filter(Boolean);
+  const placeTitle = placeName || addressTitle;
+  const placeDetail = placeName ? draft.venue : addressRest.join(", ");
   useEffect(() => { if (draft.venue) setShowMap(true); }, [draft.venue]);
   return <div className="relative h-full">
     <div className="no-scrollbar h-full overflow-y-auto">
@@ -249,12 +566,12 @@ function CreateEvent() {
         <p className="mt-3 text-[13px] text-white/60">Организатор</p>
         <p className="text-[22px] font-semibold leading-7">Вадим Филатов</p>
       </div>
-      {showMap && draft.venue && mapSrc && <div className="relative mt-3 rounded-[32px] bg-[#1a040861] px-5 pb-4 pt-5 text-center">
+      {showMap && draft.venue && draft.lat != null && draft.lng != null && <div className="relative mt-3 rounded-[32px] bg-[#1a040861] px-5 pb-4 pt-5 text-center">
         <button aria-label="Скрыть карту" onClick={() => setShowMap(false)} className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full bg-white/10"><X size={16} /></button>
         <MapPin size={22} className="mx-auto text-[#8eb6ff]" />
         <p className="mt-2 text-[20px] font-semibold leading-6">{placeTitle}</p>
         {placeDetail && <p className="mt-1 text-[15px] text-white/75">{placeDetail}</p>}
-        <iframe title="Карта локации" src={mapSrc} className="mt-4 h-52 w-full rounded-[22px] border-0" />
+        <LocationMap lat={draft.lat} lng={draft.lng} />
       </div>}
       <div className="mt-3 rounded-[32px] bg-[#1a040861] px-5 py-4 text-center">
         <p className="text-[13px] font-medium tracking-wide text-white/55">ДЛЯ КОМАНДЫ</p>
@@ -269,31 +586,221 @@ function CreateEvent() {
   </div>;
 }
 
+function minutesOf(value: string) {
+  const match = /^(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return null;
+  return hours * 60 + minutes;
+}
+
+function clockLabel(minutes: number) {
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+}
+
+function scheduleRanges(schedules: Record<string, ScheduleBlock[]>, memberIds: readonly string[]) {
+  return memberIds.flatMap((id) => schedules[id] ?? []).flatMap((block) => {
+    const { start, end } = splitRange(block.time);
+    const from = minutesOf(start);
+    const to = minutesOf(end);
+    if (from === null || to === null || to < from) return [];
+    return [{ location: block.location, from, to, color: block.color }];
+  }).sort((left, right) => left.from - right.from || left.to - right.to);
+}
+
+function momentAt(ranges: Array<{ location: string; from: number; to: number; color: string }>, selected: number) {
+  const running = ranges.find((item) => item.from <= selected && selected < item.to);
+  const upcoming = ranges.find((item) => item.from >= selected);
+  const item = running ?? upcoming ?? ranges[ranges.length - 1];
+  const away = item.from - selected;
+  return {
+    at: item.from,
+    title: `${item.location} в ${clockLabel(item.from)}`,
+    detail: running || away === 0 ? "сейчас" : away > 0 ? formatAway(away) : "уже прошло",
+  };
+}
+
+function liveTimeline(schedules: Record<string, ScheduleBlock[]>, memberIds: readonly string[], current: number) {
+  const ranges = scheduleRanges(schedules, memberIds);
+  if (!ranges.length) return null;
+  const upcoming = ranges.find((item) => item.from >= current);
+  const running = ranges.find((item) => item.from <= current && current < item.to);
+  const last = ranges[ranges.length - 1];
+  const moment = upcoming
+    ? { at: upcoming.from, title: `${upcoming.location} в ${clockLabel(upcoming.from)}` }
+    : running
+      ? { at: running.to, title: `${running.location} до ${clockLabel(running.to)}` }
+      : { at: last.from, title: `${last.location} в ${clockLabel(last.from)}` };
+  return { moment, ranges };
+}
+
+const liveCueStyle = { fontSize: 16, fontWeight: 400, lineHeight: "24px" };
+
 function Timeline() {
   const now = useClock();
-  const current = now.getHours() * 60 + now.getMinutes();
-  const start = 16 * 60;
-  const end = 22 * 60;
-  const award = 19 * 60 + 30;
-  const progress = Math.min(100, Math.max(0, ((current - start) / (end - start)) * 100));
-  const awardMark = ((award - start) / (end - start)) * 100;
-  const label = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-  return <div className="rounded-[28px] bg-white/10 p-4">
-    <div className="flex items-center justify-between"><div><p className="text-[11px] font-semibold text-[#ff6b00]">СЕЙЧАС</p><p className="text-5xl font-bold tracking-[-.04em] tabular">{label}</p></div><div className="text-right text-[12px] font-semibold"><p>Награждение в 19:30</p><p className="text-[#ff6b00]">{award - current >= 0 ? formatAway(award - current) : "уже прошло"}</p></div></div>
-    <div className="relative mt-5"><div className="h-1.5 rounded-full bg-white/15"><div className="h-full rounded-full bg-[#ff6b00]" style={{ width: `${progress}%` }} /></div><i className="absolute top-[-4px] h-3.5 w-3.5 -translate-x-1/2 rounded-full border-[3px] border-[#ff6b00] bg-white" style={{ left: `${progress}%` }} /><i className="absolute top-0 h-2 w-2 -translate-x-1/2 rounded-full bg-yellow-300" style={{ left: `${awardMark}%` }} /></div>
-    <div className="mt-2 flex justify-between text-[9px] text-white/45 tabular">{[16,17,18,19,20,21,22].map((h) => <span key={h}>{h}</span>)}</div>
+  const record = useEmbersStore(focusedEvent);
+  const liveMinutes = now.getHours() * 60 + now.getMinutes();
+  const [scrub, setScrub] = useState<number | null>(null);
+  useEffect(() => { setScrub(null); }, [record.id]);
+  const timeline = liveTimeline(record.schedules, record.team.map((member) => member.id), liveMinutes);
+  const selected = scrub ?? liveMinutes;
+  const preview = timeline && scrub !== null ? momentAt(timeline.ranges, selected) : null;
+  const moment = preview ?? timeline?.moment ?? null;
+  const label = clockLabel(scrub ?? liveMinutes);
+  const day = 24 * 60;
+  const progress = Math.min(100, Math.max(0, (selected / day) * 100));
+  const away = timeline && !preview ? timeline.moment.at - liveMinutes : 0;
+  const detail = preview ? preview.detail : timeline ? (away > 0 ? formatAway(away) : away === 0 ? "сейчас" : "уже прошло") : "Добавьте точки дня";
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const alignFrame = useRef(0);
+  const [viewport, setViewport] = useState(0);
+  const anchored = useRef<string | null>(null);
+  useEffect(() => () => cancelAnimationFrame(alignFrame.current), []);
+  useLayoutEffect(() => {
+    const node = scrollerRef.current;
+    if (!node) return;
+    const measure = () => setViewport(node.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [timeline]);
+  useLayoutEffect(() => {
+    const node = scrollerRef.current;
+    if (!node || !viewport || anchored.current === record.id) return;
+    const hourWidth = viewport / 6;
+    const nowX = 8 + (liveMinutes / 60) * hourWidth;
+    node.scrollLeft = Math.max(0, nowX - viewport * 0.28);
+    anchored.current = record.id;
+  }, [viewport, record.id, liveMinutes]);
+  const scrubTo = (clientX: number, element: HTMLElement) => {
+    const rect = element.getBoundingClientRect();
+    const ratio = rect.width ? Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)) : 0;
+    const minutes = Math.round(ratio * day);
+    setScrub(Math.abs(minutes - liveMinutes) <= 1 ? null : Math.min(day, minutes));
+  };
+  const alignLiveToStart = (fromMinutes?: number) => {
+    const node = scrollerRef.current;
+    if (!node || !viewport) return;
+    const hourWidth = viewport / 6;
+    const xFor = (minutes: number) => 8 + (minutes / 60) * hourWidth;
+    const maxScroll = Math.max(0, node.scrollWidth - node.clientWidth);
+    const target = Math.min(maxScroll, Math.max(0, xFor(liveMinutes) - 18));
+    const start = node.scrollLeft;
+    const delta = target - start;
+    const origin = fromMinutes ?? liveMinutes;
+    const minuteDelta = liveMinutes - origin;
+    cancelAnimationFrame(alignFrame.current);
+    if (Math.abs(delta) < 1 && Math.abs(minuteDelta) < 1) {
+      setScrub(null);
+      return;
+    }
+    const duration = 420;
+    const started = performance.now();
+    const step = (time: number) => {
+      const progress = Math.min(1, (time - started) / duration);
+      const eased = 1 - (1 - progress) ** 3;
+      node.scrollLeft = start + delta * eased;
+      if (progress < 1) {
+        if (fromMinutes !== undefined) setScrub(Math.round(origin + minuteDelta * eased));
+        alignFrame.current = requestAnimationFrame(step);
+      } else {
+        node.scrollLeft = target;
+        setScrub(null);
+      }
+    };
+    alignFrame.current = requestAnimationFrame(step);
+  };
+  const panScale = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const scroller = scrollerRef.current;
+    if (!scroller || event.button !== 0) return;
+    cancelAnimationFrame(alignFrame.current);
+    const pointerId = event.pointerId;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startScroll = scroller.scrollLeft;
+    let locked: "x" | "y" | null = null;
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+      if (!locked && Math.hypot(dx, dy) > 6) locked = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+      if (locked !== "x") return;
+      ev.preventDefault();
+      scroller.scrollLeft = startScroll - dx;
+    };
+    const up = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move, { passive: false });
+    window.addEventListener("pointerup", up);
+  };
+  const dayWidth = viewport > 0 ? (viewport / 6) * 24 : 0;
+  return <div className="rounded-[28px] bg-white/10 px-4 pb-[27px] pt-4">
+    {scrub === null ? <button type="button" onClick={() => alignLiveToStart()} className="text-[#ff6b00]" style={liveCueStyle}>сейчас</button> : <button type="button" onClick={() => alignLiveToStart(scrub)} className="text-[#ff6b00]" style={liveCueStyle}>вернуться к live</button>}
+    <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4">
+      <p className="text-[48px] font-bold leading-[58px] tracking-[-0.04em] tabular">{label}</p>
+      <div className="text-right text-[15px] font-semibold leading-[18px]">
+        <p className="truncate">{moment ? moment.title : "Нет расписания"}</p>
+        <p className="mt-0.5 truncate text-[#ff6b00]">{detail}</p>
+      </div>
+    </div>
+    {timeline && <div ref={scrollerRef} className="no-scrollbar mt-[14px] overflow-x-auto overflow-y-hidden">
+      {dayWidth > 0 && <div style={{ width: dayWidth + 16 }} className="px-2">
+        <div className="relative py-2">
+          <div className="relative h-1.5">
+            <div
+              role="slider"
+              aria-label="Время дня"
+              aria-valuemin={0}
+              aria-valuemax={day}
+              aria-valuenow={Math.min(day, Math.max(0, selected))}
+              aria-valuetext={clockLabel(Math.min(day, Math.max(0, selected)))}
+              tabIndex={0}
+              onPointerDown={(event) => {
+                event.stopPropagation();
+                const slider = event.currentTarget;
+                scrubTo(event.clientX, slider);
+                slider.setPointerCapture(event.pointerId);
+              }}
+              onPointerMove={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) scrubTo(event.clientX, event.currentTarget); }}
+              onKeyDown={(event) => {
+                const step = event.shiftKey ? 60 : 15;
+                if (event.key === "ArrowRight") { event.preventDefault(); setScrub(Math.min(day, selected + step)); }
+                if (event.key === "ArrowLeft") { event.preventDefault(); const next = Math.max(0, selected - step); setScrub(Math.abs(next - liveMinutes) <= 1 ? null : next); }
+                if (event.key === "Home") { event.preventDefault(); setScrub(null); }
+              }}
+              className="absolute -inset-y-3 inset-x-0 z-10 cursor-pointer touch-none"
+            />
+            <div className="pointer-events-none relative h-1.5 rounded-full bg-white/15">
+              {timeline.ranges.map((item) => <span key={`${item.location}-${item.from}-${item.to}`} className="absolute inset-y-0 rounded-full" style={{ left: `${(item.from / day) * 100}%`, width: `${((item.to - item.from) / day) * 100}%`, background: item.color }} />)}
+              <span aria-hidden className="absolute top-1/2 z-10 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-[#ff6b00] bg-white" style={{ left: `${progress}%` }} />
+            </div>
+          </div>
+        </div>
+        <div onPointerDown={panScale} className="relative z-20 mt-0.5 h-8 cursor-grab touch-pan-x select-none active:cursor-grabbing">
+          <div className="relative h-[13px] text-[11px] leading-[13px] text-white/45">
+            {Array.from({ length: 25 }, (_, hour) => <span key={hour} className="absolute top-0 w-4 -translate-x-1/2 text-center tabular" style={{ left: `${(hour / 24) * 100}%` }}>{hour}</span>)}
+          </div>
+        </div>
+      </div>}
+    </div>}
   </div>;
 }
 
 function MapCard() {
   const open = useEmbersStore((s) => s.openSheet);
+  const team = useEmbersStore((s) => focusedEvent(s).team);
   const onSite = team.filter((member) => member.status === "on_site").length;
   const inTransit = team.filter((member) => member.status === "in_transit").length;
   return <div className="rounded-[28px] bg-white/10 p-4"><h3 className="text-xl font-bold">Карта</h3><p className="mt-0.5 text-[11px] text-white/45">{onSite} на площадке · {inTransit} в пути</p>
     <div className="relative mt-2 h-[164px] overflow-hidden rounded-[18px] bg-[#26262b]">
       <i className="absolute -left-5 top-20 h-2 w-[420px] rotate-[8deg] bg-[#3a3a42]" /><i className="absolute left-28 -top-10 h-[260px] w-3 rotate-[8deg] bg-[#3a3a42]" /><i className="absolute right-14 -top-10 h-[260px] w-2 -rotate-12 bg-[#3a3a42]" />
       <span className="absolute right-10 top-3 h-[70px] w-[110px] rounded-[18px] bg-green-500/20" />
-      <span className="absolute left-[168px] top-[72px] rounded-full bg-black/70 px-2 py-1 text-[9px] font-semibold">Сцена А</span>
+      {team.some((member) => member.spot.includes("Сцена")) && <span className="absolute left-[168px] top-[72px] rounded-full bg-black/70 px-2 py-1 text-[9px] font-semibold">Сцена А</span>}
       {team.map((m) => <button key={m.id} onClick={() => open("member", m.id)} style={{ left: `${m.coords.x}%`, top: `${m.coords.y}%` }} className="absolute -translate-x-1/2 -translate-y-1/2"><Avatar member={m} size={30} /></button>)}
     </div>
     <button className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-full bg-white/15 text-[13px] font-semibold"><Asset src="/figma-nav.svg" className="h-4 w-4" />Маршрут и карта</button>
@@ -334,27 +841,34 @@ function MemberRow({ member, role, revealed, onReveal, onClose }: { member: Memb
 function TeamList() {
   const filter = useEmbersStore((s) => s.teamFilter);
   const setFilter = useEmbersStore((s) => s.filterTeam);
-  const roles = useEmbersStore((s) => s.memberRoles);
+  const record = useEmbersStore(focusedEvent);
+  const team = record.team;
+  const roles = record.memberRoles;
+  const open = useEmbersStore((s) => s.openSheet);
   const [swipedId, setSwipedId] = useState<string | null>(null);
   const counts = { all: team.length, on_site: team.filter((member) => member.status === "on_site").length, in_transit: team.filter((member) => member.status === "in_transit").length };
   const visible = filter === "all" ? team : team.filter((m) => m.status === filter);
   return <><LayoutGroup><div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 py-3">
     {([["all", `Все · ${counts.all}`], ["on_site", `На площадке · ${counts.on_site}`], ["in_transit", `В пути · ${counts.in_transit}`]] as const).map(([id, label]) => <button key={id} onClick={() => setFilter(id)} className={cn("relative shrink-0 rounded-full px-3 py-2 text-[13px]", filter === id ? "text-black" : "bg-white/10")} >{filter === id && <motion.i layoutId="filter" transition={spring} className="absolute inset-0 rounded-full bg-white" />}<span className="relative">{label}</span></button>)}
-  </div></LayoutGroup><h2 className="mb-3 text-xl font-bold">Команда</h2>
+  </div></LayoutGroup>
+    <div className="mb-3 flex items-center"><h2 className="text-xl font-bold">Команда</h2><button type="button" onClick={() => open("invite")} className="ml-auto flex h-9 items-center gap-1.5 rounded-full bg-[#ff6b00] px-3 text-[13px] font-semibold"><Plus size={16} />Добавить</button></div>
+    {team.length === 0 && <p className="mb-3 text-[14px] leading-5 text-white/45">Пока никого нет. Добавьте участника или отправьте приглашение.</p>}
     <AnimatePresence mode="popLayout">{visible.map((m) => <MemberRow key={m.id} member={m} role={roles[m.id] ?? m.role} revealed={swipedId === m.id} onReveal={() => setSwipedId(m.id)} onClose={() => setSwipedId((current) => current === m.id ? null : current)} />)}</AnimatePresence></>;
 }
 
 function LiveBoard() {
   const setScreen = useEmbersStore((s) => s.setScreen);
   const open = useEmbersStore((s) => s.openSheet);
-  const myStatus = useEmbersStore((s) => s.myStatus);
-  const event = useEmbersStore((s) => s.event);
+  const record = useEmbersStore(focusedEvent);
+  const now = useClock();
+  const myStatus = record.myStatus;
+  const event = record.details;
   return <div className="relative min-h-[1520px] bg-black pb-8" data-node-id="2:598">
     <div className="figma-gradient pointer-events-none absolute inset-x-0 top-0 h-[416px]" />
     <div className="absolute left-5 top-10 z-30"><CircleButton onClick={() => setScreen("hub")} label="Назад"><Asset src="/figma-back.svg" /></CircleButton></div>
-    <div className="absolute right-5 top-10 z-30 flex gap-2"><CircleButton label="Поделиться" onClick={() => { void shareInvite(event.title).then(shareResult); }}><Asset src="/figma-share.svg" /></CircleButton><button onClick={() => open("account")} aria-label="Аккаунт" className="grid h-11 w-11 place-items-center rounded-full bg-[#9c613d] text-sm font-semibold">ВФ</button></div>
+    <div className="absolute right-5 top-10 z-30 flex gap-2"><CircleButton label="Поделиться" onClick={() => { void shareInvite(event.title, record.code).then(shareResult); }}><Asset src="/figma-share.svg" /></CircleButton><button onClick={() => open("account")} aria-label="Аккаунт" className="grid h-11 w-11 place-items-center rounded-full bg-[#9c613d] text-sm font-semibold">ВФ</button></div>
     <div className="relative z-0 px-5 pt-[104px]">
-      <div className="text-center"><span className="inline-flex h-[30px] items-center gap-1 rounded-full bg-black/30 px-3 text-[11px] font-bold"><i className="h-2 w-2 rounded-full bg-red-500" />LIVE</span><h1 className="mt-2 text-[28px] font-extrabold tracking-tight">{event.title}</h1><p className="text-[11px] text-white/85">{event.dateLabel} · {event.venue}</p></div>
+      <div className="text-center"><EventStatusBadge phase={eventPhase(event, now.getTime())} size="board" /><h1 className="mt-2 text-[28px] font-extrabold tracking-tight">{event.title}</h1><p className="text-[11px] text-white/85">{event.dateLabel} · {event.venue}</p></div>
       <div className="mt-4"><Timeline /></div>
       <div className="mt-3 flex h-[52px] items-center rounded-[22px] bg-white/10 px-3"><span className="grid h-9 w-9 place-items-center rounded-full" style={{ background: `${statusMeta[myStatus].color}33` }}><MapPin size={18} style={{ color: statusMeta[myStatus].color }} /></span><div className="ml-3 flex-1"><p className="text-[10px] text-white/45">Мой статус</p><p className="text-[13px] font-semibold">{statusMeta[myStatus].label}</p></div><button onClick={() => open("status")} className="h-9 rounded-full bg-[#ff6b00] px-4 text-xs font-semibold">Сменить</button></div>
       <div className="mt-3"><MapCard /></div><TeamList />
@@ -429,7 +943,7 @@ function JoinSheet() {
   const setRole = useEmbersStore((s) => s.setJoinRole);
   const error = useEmbersStore((s) => s.joinError);
   const join = useEmbersStore((s) => s.joinByCode);
-  const event = useEmbersStore((s) => s.event);
+  const event = useEmbersStore((s) => s.events.find((item) => item.code === s.joinCode));
   const pasteLink = async () => {
     const text = await navigator.clipboard.readText().catch(() => "");
     const found = text.toUpperCase().match(/[A-Z0-9]{6}/);
@@ -444,13 +958,13 @@ function JoinSheet() {
     <div className="mt-4 overflow-hidden rounded-[20px] bg-[#2c2c2e]"><button onClick={pasteLink} className="flex h-[52px] w-full items-center gap-3 px-4 text-[17px]"><Asset src="/figma-link.svg" className="h-[22px] w-[22px]" />Вставить ссылку<ChevronRight className="ml-auto text-white/40" size={18} /></button><button onClick={() => setScanning((value) => !value)} className="flex h-[52px] w-full items-center gap-3 border-t border-white/15 px-4 text-[17px]"><Asset src="/figma-qr.svg" className="h-[22px] w-[22px]" />{scanning ? "Закрыть камеру" : "Сканировать QR-код"}<ChevronRight className="ml-auto text-white/40" size={18} /></button></div>
     {scanning && <div className="mt-3 overflow-hidden rounded-[20px]"><QrScanner onCode={onCode} /></div>}
     <p className="ml-5 mt-5 text-[12px] text-white/50">ПРЕДПРОСМОТР</p>
-    <div className="mt-2 rounded-[20px] bg-[#2c2c2e] p-4"><div className="flex items-center gap-3"><span className="h-14 w-14 rounded-[14px] bg-gradient-to-b from-[#ff8a1f] via-[#d2321c] to-[#3b0b22]" /><div><b className="text-[17px]">{event.title}</b><p className="text-[12px] text-white/50">Пригласил Вадим Филатов · {team.length} в команде</p></div></div><div className="my-4 h-px bg-white/15" /><b className="text-[14px]">Выберите свою роль</b><div className="mt-3 flex flex-wrap gap-2">{["Свет","Звук","Видео","Фото","Продюсер","Площадка","Техник"].map((item) => <button key={item} onClick={() => setRole(item)} className={cn("h-9 rounded-full px-3.5 text-[14px]", role === item ? "bg-[#ff6b00]" : "bg-white/10")}>{item}</button>)}</div></div>
+    <div className="mt-2 rounded-[20px] bg-[#2c2c2e] p-4"><div className="flex items-center gap-3"><span className="h-14 w-14 rounded-[14px] bg-gradient-to-b from-[#ff8a1f] via-[#d2321c] to-[#3b0b22]" /><div><b className="text-[17px]">{event ? event.details.title : "Код ещё не совпал"}</b><p className="text-[12px] text-white/50">{event ? `Пригласил Вадим Филатов · ${event.team.length} в команде` : "Введите код события"}</p></div></div><div className="my-4 h-px bg-white/15" /><b className="text-[14px]">Выберите свою роль</b><div className="mt-3 flex flex-wrap gap-2">{["Свет","Звук","Видео","Фото","Продюсер","Площадка","Техник"].map((item) => <button key={item} onClick={() => setRole(item)} className={cn("h-9 rounded-full px-3.5 text-[14px]", role === item ? "bg-[#ff6b00]" : "bg-white/10")}>{item}</button>)}</div></div>
     <button onClick={() => join()} className="mt-[98px] h-[54px] w-full rounded-full bg-[#ff6b00] text-[17px] font-semibold">Присоединиться</button>
   </div>;
 }
 
 function DateSheet() {
-  const draft = useEmbersStore((s) => s.draft);
+  const draft = useEmbersStore((s) => s.draftEvent?.details ?? blankDraft);
   const toggleAllDay = useEmbersStore((s) => s.toggleAllDay);
   const updateDraft = useEmbersStore((s) => s.updateDraft);
   const [zonesOpen, setZonesOpen] = useState(false);
@@ -466,7 +980,7 @@ const knownPlaces: MapPlace[] = [
 ];
 
 function LocationSheet() {
-  const draft = useEmbersStore((s) => s.draft);
+  const draft = useEmbersStore((s) => s.draftEvent?.details ?? blankDraft);
   const updateDraft = useEmbersStore((s) => s.updateDraft);
   const setNotice = useEmbersStore((s) => s.setNotice);
   const [query, setQuery] = useState("");
@@ -524,41 +1038,79 @@ function LocationSheet() {
   </div>;
 }
 
+const roleSuggestions = ["Свет", "Звук", "Видео", "Фото", "Продюсер", "Площадка", "Техник"];
+
 function InviteSheet() {
-  const event = useEmbersStore((s) => s.event);
-  const openRoles = useEmbersStore((s) => s.openRoles);
+  const record = useEmbersStore(focusedEvent);
+  const event = record.details;
+  const team = record.team;
+  const openRoles = record.openRoles;
   const addOpenRole = useEmbersStore((s) => s.addOpenRole);
+  const addTeamMember = useEmbersStore((s) => s.addTeamMember);
   const openSchedule = useEmbersStore((s) => s.openSchedule);
-  const roles = useEmbersStore((s) => s.memberRoles);
+  const roles = record.memberRoles;
   const [adding, setAdding] = useState(false);
   const [roleName, setRoleName] = useState("");
+  const [addingPerson, setAddingPerson] = useState(team.length === 0);
+  const [personName, setPersonName] = useState("");
+  const [personRole, setPersonRole] = useState("");
   const saveRole = () => {
     if (!roleName.trim()) return;
     addOpenRole(roleName);
     setRoleName("");
     setAdding(false);
   };
-  return <div data-node-id="2:511"><SheetHeader title="Команда" /><div className="mt-2 flex h-[150px] items-center gap-4 rounded-[20px] bg-[#2c2c2e] p-4"><span className="grid h-24 w-24 place-items-center rounded-2xl bg-white"><Asset src="/figma-qr-large.svg" className="h-[76px] w-[76px]" /></span><div><b className="text-[17px]">Пригласите команду</b><p className="text-[15px] text-[#ff6b00]">embers.app/j/K7Q2X9</p><p className="text-[12px] text-white/50">Код: K7Q2X9</p><button onClick={() => { void shareInvite(event.title).then(shareResult); }} className="mt-3 flex h-9 items-center gap-2 rounded-full bg-[#ff6b00] px-3.5 text-[14px] font-semibold"><Share2 size={16} />Поделиться</button></div></div><p className="ml-5 mt-5 text-[12px] text-white/50">УЧАСТНИКИ · {team.length + 1 + openRoles.length}</p><div className="mt-2 overflow-hidden rounded-[20px] bg-[#2c2c2e]"><button onClick={() => openSchedule("vadim")} className="flex h-[60px] w-full items-center gap-3 px-4 text-left"><span className="grid h-10 w-10 place-items-center rounded-full bg-[#ff6b00]">ВФ</span><div className="flex-1"><p>Вадим Филатов <Crown size={13} className="inline text-[#ff6b00]" /></p><small className="text-white/50">{roles.vadim}</small></div><ChevronRight size={18} className="text-white/40" /></button>{team.map((m) => <button key={m.id} onClick={() => openSchedule(m.id)} className="ml-4 flex h-[60px] w-[calc(100%-1rem)] items-center gap-3 border-t border-white/15 pr-4 text-left"><Avatar member={m} size={40} /><div className="flex-1"><p>{m.name}</p><small className="text-white/50">{roles[m.id] ?? m.role}</small></div><ChevronRight size={18} className="text-white/40" /></button>)}{openRoles.map((role) => <div key={role} className="ml-4 flex h-[60px] items-center gap-3 border-t border-white/15 pr-4"><span className="grid h-10 w-10 place-items-center rounded-full bg-white/10 text-[13px]">+</span><div><p>{role}</p><small className="text-white/50">Свободная роль</small></div></div>)}{adding ? <div className="ml-4 flex h-[56px] items-center gap-2 border-t border-white/15 pr-4"><input value={roleName} onChange={(e) => setRoleName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveRole()} placeholder="Название роли" className="h-10 flex-1 bg-transparent text-[17px] outline-none placeholder:text-white/40" /><button onClick={saveRole} className="h-9 rounded-full bg-[#ff6b00] px-3 text-[14px] font-semibold">Добавить</button></div> : <button onClick={() => setAdding(true)} className="ml-4 flex h-[56px] w-[calc(100%-1rem)] items-center gap-3 border-t border-white/15 text-[#ff6b00]"><span className="grid h-10 w-10 place-items-center rounded-full bg-orange-500/15"><Plus /></span>Добавить роль</button>}</div></div>;
+  const savePerson = () => {
+    if (personName.trim().length < 2) {
+      addTeamMember(personName, personRole);
+      return;
+    }
+    addTeamMember(personName, personRole);
+    setPersonName("");
+    setPersonRole("");
+    setAddingPerson(false);
+  };
+  return <div data-node-id="2:511">
+    <SheetHeader title="Команда" />
+    <div className="mt-2 flex h-[150px] items-center gap-4 rounded-[20px] bg-[#2c2c2e] p-4"><span className="grid h-24 w-24 place-items-center rounded-2xl bg-white"><Asset src="/figma-qr-large.svg" className="h-[76px] w-[76px]" /></span><div><b className="text-[17px]">Пригласите команду</b><p className="text-[15px] text-[#ff6b00]">embers.app/j/{record.code}</p><p className="text-[12px] text-white/50">Код: {record.code}</p><button onClick={() => { void shareInvite(event.title || "Событие", record.code).then(shareResult); }} className="mt-3 flex h-9 items-center gap-2 rounded-full bg-[#ff6b00] px-3.5 text-[14px] font-semibold"><Share2 size={16} />Поделиться</button></div></div>
+    <p className="ml-5 mt-5 text-[12px] text-white/50">УЧАСТНИКИ · {team.length + 1 + openRoles.length}</p>
+    <div className="mt-2 overflow-hidden rounded-[20px] bg-[#2c2c2e]">
+      <button onClick={() => openSchedule("vadim")} className="flex h-[60px] w-full items-center gap-3 px-4 text-left"><span className="grid h-10 w-10 place-items-center rounded-full bg-[#ff6b00]">ВФ</span><div className="flex-1"><p>Вадим Филатов <Crown size={13} className="inline text-[#ff6b00]" /></p><small className="text-white/50">{roles.vadim}</small></div><ChevronRight size={18} className="text-white/40" /></button>
+      {team.map((m) => <button key={m.id} onClick={() => openSchedule(m.id)} className="ml-4 flex h-[60px] w-[calc(100%-1rem)] items-center gap-3 border-t border-white/15 pr-4 text-left"><Avatar member={m} size={40} /><div className="flex-1"><p>{m.name}</p><small className="text-white/50">{roles[m.id] ?? m.role}</small></div><ChevronRight size={18} className="text-white/40" /></button>)}
+      {openRoles.map((role) => <div key={role} className="ml-4 flex h-[60px] items-center gap-3 border-t border-white/15 pr-4"><span className="grid h-10 w-10 place-items-center rounded-full bg-white/10 text-[13px]">+</span><div><p>{role}</p><small className="text-white/50">Свободная роль</small></div></div>)}
+      {addingPerson ? <div className="border-t border-white/15 px-4 py-3">
+        <input value={personName} onChange={(event) => setPersonName(event.target.value)} onKeyDown={(event) => event.key === "Enter" && savePerson()} placeholder="Имя" className="h-11 w-full bg-transparent text-[17px] outline-none placeholder:text-white/40" />
+        <input value={personRole} onChange={(event) => setPersonRole(event.target.value)} onKeyDown={(event) => event.key === "Enter" && savePerson()} placeholder="Роль" className="h-11 w-full border-t border-white/10 bg-transparent text-[17px] outline-none placeholder:text-white/40" />
+        <div className="mt-2 flex flex-wrap gap-2">{roleSuggestions.map((item) => <button key={item} type="button" onClick={() => setPersonRole(item)} className={cn("h-8 rounded-full px-3 text-[13px]", personRole === item ? "bg-[#ff6b00]" : "bg-white/10")}>{item}</button>)}</div>
+        <button type="button" onClick={savePerson} className="mt-3 h-10 rounded-full bg-[#ff6b00] px-4 text-[15px] font-semibold">Добавить</button>
+      </div> : <button onClick={() => setAddingPerson(true)} className="ml-4 flex h-[56px] w-[calc(100%-1rem)] items-center gap-3 border-t border-white/15 text-[#ff6b00]"><span className="grid h-10 w-10 place-items-center rounded-full bg-orange-500/15"><Plus /></span>Добавить участника</button>}
+      {adding ? <div className="ml-4 flex h-[56px] items-center gap-2 border-t border-white/15 pr-4"><input value={roleName} onChange={(e) => setRoleName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveRole()} placeholder="Название роли" className="h-10 flex-1 bg-transparent text-[17px] outline-none placeholder:text-white/40" /><button onClick={saveRole} className="h-9 rounded-full bg-[#ff6b00] px-3 text-[14px] font-semibold">Добавить</button></div> : <button onClick={() => setAdding(true)} className="ml-4 flex h-[56px] w-[calc(100%-1rem)] items-center gap-3 border-t border-white/15 text-[#ff6b00]"><span className="grid h-10 w-10 place-items-center rounded-full bg-orange-500/15"><Plus /></span>Добавить роль</button>}
+    </div>
+  </div>;
 }
 
 function MemberSheet() {
   const id = useEmbersStore((s) => s.selectedMemberId);
-  const event = useEmbersStore((s) => s.event);
+  const record = useEmbersStore(focusedEvent);
+  const event = record.details;
   const close = useEmbersStore((s) => s.closeSheet);
-  const roles = useEmbersStore((s) => s.memberRoles);
-  const member = team.find((m) => m.id === id) ?? team[0];
+  const roles = record.memberRoles;
+  const member = record.team.find((m) => m.id === id);
+  if (!member) return null;
   const role = roles[member.id] ?? member.role;
   const roleLine = role === member.role && member.roleLong ? `${role} · ${member.roleLong.toLowerCase()}` : role;
   const now = member.currentTask.split(" · ");
   const next = member.next.split(" · ");
   const rows = [["Где", `${member.spot} · ${event.venue}`], [now[1] ? `Сейчас · ${now[1]}` : "Сейчас", now[0]], [next.length > 1 ? `Дальше · ${next[0]}` : "Дальше", next.at(-1) ?? member.next]];
-  return <div data-node-id="2:890"><div className="flex h-11"><CircleButton onClick={close}><X size={20} /></CircleButton></div><div className="flex flex-col items-center"><Avatar member={member} size={88} /><h2 className="mt-3 text-[26px] font-bold">{member.name}</h2><p className="text-[15px] text-white/50">{roleLine}</p><div className="mt-2"><StatusPill status={member.status} /></div></div><div className="mt-5 grid grid-cols-3 gap-4"><a href={`tel:${member.phone}`} className="flex h-16 flex-col items-center justify-center gap-1 rounded-2xl bg-[#2c2c2e] text-[12px] font-medium text-[#ff6b00]"><Phone size={21} />Позвонить</a><a href={`sms:${member.phone}`} className="flex h-16 flex-col items-center justify-center gap-1 rounded-2xl bg-[#2c2c2e] text-[12px] font-medium text-[#ff6b00]"><Sparkles size={21} />Написать</a><button onClick={close} className="flex h-16 flex-col items-center justify-center gap-1 rounded-2xl bg-[#2c2c2e] text-[12px] font-medium text-[#ff6b00]"><MapPin size={21} />На карте</button></div><div className="mt-4 overflow-hidden rounded-[20px] bg-[#2c2c2e] px-4">{rows.map(([label, value], i) => <div key={label} className={cn("flex h-16 flex-col justify-center pl-9", i > 0 && "border-t border-white/15")}><small className="text-white/50">{label}</small><span className="text-[17px]">{value}</span></div>)}</div><p className="ml-5 mt-4 text-[12px] text-white/50">ДЕНЬ {member.name.split(" ")[0].toUpperCase()}</p><div className="mt-2 rounded-[20px] bg-[#2c2c2e] p-4"><div className="relative flex gap-[3px]">{["w-[12%] bg-[#636366]","w-[22%] bg-[#5e5ce6]","w-[9%] bg-[#ffd60a]","w-[28%] bg-[#30d158]","w-[12%] bg-[#ff6b00]","flex-1 bg-[#5e5ce6]"].map((c,i) => <i key={i} className={cn("h-3 rounded",c)} />)}<b className="absolute left-[55%] -top-1.5 h-6 w-0.5 bg-white" /></div><div className="mt-3 flex justify-between text-[10px] text-white/50"><span>08</span><span>12</span><span>16</span><span>20</span><span>23</span></div></div></div>;
+  const missingPhone = () => useEmbersStore.getState().setNotice("Номер не указан");
+  return <div data-node-id="2:890"><div className="flex h-11"><CircleButton onClick={close}><X size={20} /></CircleButton></div><div className="flex flex-col items-center"><Avatar member={member} size={88} /><h2 className="mt-3 text-[26px] font-bold">{member.name}</h2><p className="text-[15px] text-white/50">{roleLine}</p><div className="mt-2"><StatusPill status={member.status} /></div></div><div className="mt-5 grid grid-cols-3 gap-4">{member.phone ? <a href={`tel:${member.phone}`} className="flex h-16 flex-col items-center justify-center gap-1 rounded-2xl bg-[#2c2c2e] text-[12px] font-medium text-[#ff6b00]"><Phone size={21} />Позвонить</a> : <button onClick={missingPhone} className="flex h-16 flex-col items-center justify-center gap-1 rounded-2xl bg-[#2c2c2e] text-[12px] font-medium text-[#ff6b00]"><Phone size={21} />Позвонить</button>}{member.phone ? <a href={`sms:${member.phone}`} className="flex h-16 flex-col items-center justify-center gap-1 rounded-2xl bg-[#2c2c2e] text-[12px] font-medium text-[#ff6b00]"><Sparkles size={21} />Написать</a> : <button onClick={missingPhone} className="flex h-16 flex-col items-center justify-center gap-1 rounded-2xl bg-[#2c2c2e] text-[12px] font-medium text-[#ff6b00]"><Sparkles size={21} />Написать</button>}<button onClick={close} className="flex h-16 flex-col items-center justify-center gap-1 rounded-2xl bg-[#2c2c2e] text-[12px] font-medium text-[#ff6b00]"><MapPin size={21} />На карте</button></div><div className="mt-4 overflow-hidden rounded-[20px] bg-[#2c2c2e] px-4">{rows.map(([label, value], i) => <div key={label} className={cn("flex h-16 flex-col justify-center pl-9", i > 0 && "border-t border-white/15")}><small className="text-white/50">{label}</small><span className="text-[17px]">{value}</span></div>)}</div><p className="ml-5 mt-4 text-[12px] text-white/50">ДЕНЬ {member.name.split(" ")[0].toUpperCase()}</p><div className="mt-2 rounded-[20px] bg-[#2c2c2e] p-4"><div className="relative flex gap-[3px]">{["w-[12%] bg-[#636366]","w-[22%] bg-[#5e5ce6]","w-[9%] bg-[#ffd60a]","w-[28%] bg-[#30d158]","w-[12%] bg-[#ff6b00]","flex-1 bg-[#5e5ce6]"].map((c,i) => <i key={i} className={cn("h-3 rounded",c)} />)}<b className="absolute left-[55%] -top-1.5 h-6 w-0.5 bg-white" /></div><div className="mt-3 flex justify-between text-[10px] text-white/50"><span>08</span><span>12</span><span>16</span><span>20</span><span>23</span></div></div></div>;
 }
 
 function StatusSheet() {
-  const current = useEmbersStore((s) => s.myStatus);
+  const record = useEmbersStore(focusedEvent);
+  const current = record.myStatus;
   const update = useEmbersStore((s) => s.updateMyStatus);
-  const share = useEmbersStore((s) => s.shareLocation);
+  const share = record.shareLocation;
   const toggle = useEmbersStore((s) => s.toggleShareLocation);
   const requestShare = () => {
     if (share) { toggle(); return; }
@@ -665,8 +1217,9 @@ function ScheduleRow({ block, index, marked, onRemove, onChange, onTravel }: { b
 
 function ScheduleScreen() {
   const memberId = useEmbersStore((s) => s.selectedMemberId);
-  const blocks = useEmbersStore((s) => s.schedules[memberId] ?? []);
-  const role = useEmbersStore((s) => s.memberRoles[memberId] ?? "Роль");
+  const record = useEmbersStore(focusedEvent);
+  const blocks = record.schedules[memberId] ?? emptyBlocks;
+  const role = record.memberRoles[memberId] ?? "Роль";
   const setRole = useEmbersStore((s) => s.setMemberRole);
   const add = useEmbersStore((s) => s.addScheduleBlock);
   const insert = useEmbersStore((s) => s.insertScheduleBlock);
@@ -674,8 +1227,9 @@ function ScheduleScreen() {
   const remove = useEmbersStore((s) => s.removeScheduleBlock);
   const update = useEmbersStore((s) => s.updateScheduleBlock);
   const origin = useEmbersStore((s) => s.scheduleOrigin);
-  const backToTeam = () => useEmbersStore.setState(origin === "live" ? { screen: "live", sheet: null } : { screen: "create", sheet: "invite" });
-  const person = memberId === "vadim" ? { name: "Вадим Филатов" } : team.find((member) => member.id === memberId) ?? team[0];
+  const scheduleReturn = useEmbersStore((s) => s.scheduleReturn);
+  const backToTeam = () => useEmbersStore.setState({ screen: scheduleReturn, sheet: origin === "invite" ? "invite" : null });
+  const person = memberId === "vadim" ? { name: "Вадим Филатов" } : record.team.find((member) => member.id === memberId) ?? { name: "Участник" };
   const shortName = person.name.split(" ")[0];
   const possessive = ({ Вадим: "Вадима", Костя: "Кости", Кирилл: "Кирилла", Аня: "Ани", Маша: "Маши", Илья: "Ильи" } as Record<string, string>)[shortName] ?? shortName;
   const [category, setCategory] = useState("");
@@ -694,7 +1248,7 @@ function ScheduleScreen() {
   const [blurBottom, setBlurBottom] = useState(0);
   const [wideScreen, setWideScreen] = useState(false);
   const configured = blocks.length > 0;
-  const groups = useEmbersStore((s) => s.locationGroups);
+  const groups = useEmbersStore((s) => focusedEvent(s).locationGroups);
   const palette = category ? groups.find((group) => group.name === category)?.locations ?? [] : groups.flatMap((group) => group.locations);
   const addLocation = (name = locationName.trim()) => { if (!name) return; add(name); setLocationName(""); };
   const placeIndex = (clientY: number) => {
@@ -808,7 +1362,7 @@ function ScheduleScreen() {
 }
 
 function FilesSheet() {
-  const files = useEmbersStore((s) => s.programFiles);
+  const files = useEmbersStore((s) => focusedEvent(s).programFiles);
   const addFile = useEmbersStore((s) => s.addProgramFile);
   const removeFile = useEmbersStore((s) => s.removeProgramFile);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -934,7 +1488,7 @@ function GroupPill({ name, selected, revealed, rowRef, onSelect, onOpen, onClose
 }
 
 function LocationEditor({ id, onBack }: { id: string; onBack: () => void }) {
-  const groups = useEmbersStore((s) => s.locationGroups);
+  const groups = useEmbersStore((s) => focusedEvent(s).locationGroups);
   const update = useEmbersStore((s) => s.updatePresetLocation);
   const located = groups.flatMap((group) => group.locations.map((location) => ({ ...location, group: group.name }))).find((location) => location.id === id);
   useEffect(() => { if (!located) onBack(); }, [located, onBack]);
@@ -952,7 +1506,7 @@ function LocationEditor({ id, onBack }: { id: string; onBack: () => void }) {
 }
 
 function PresetLocationsPage({ onBack }: { onBack: () => void }) {
-  const groups = useEmbersStore((s) => s.locationGroups);
+  const groups = useEmbersStore((s) => focusedEvent(s).locationGroups);
   const add = useEmbersStore((s) => s.addPresetLocation);
   const addGroup = useEmbersStore((s) => s.addLocationGroup);
   const remove = useEmbersStore((s) => s.removePresetLocation);
@@ -982,7 +1536,7 @@ function PresetLocationsPage({ onBack }: { onBack: () => void }) {
     if (!current) { useEmbersStore.getState().setNotice("Выберите группу"); return; }
     const before = current.locations.length;
     add(current.name, title);
-    const after = useEmbersStore.getState().locationGroups.find((group) => group.name === current.name)?.locations.length ?? before;
+    const after = focusedEvent(useEmbersStore.getState()).locationGroups.find((group) => group.name === current.name)?.locations.length ?? before;
     if (after > before) setName("");
   };
   const submitGroup = () => {
@@ -990,7 +1544,7 @@ function PresetLocationsPage({ onBack }: { onBack: () => void }) {
     if (!title) { setGroupDraft(null); return; }
     const before = groups.length;
     addGroup(title);
-    const next = useEmbersStore.getState().locationGroups;
+    const next = focusedEvent(useEmbersStore.getState()).locationGroups;
     if (next.length > before) { setCategory(title); setGroupDraft(null); setOpenGroup(null); }
   };
   const deleteGroup = (groupName: string) => {
@@ -1014,13 +1568,37 @@ function PresetLocationsPage({ onBack }: { onBack: () => void }) {
   </div>;
 }
 
+function ArchivePage({ onBack }: { onBack: () => void }) {
+  const events = useEmbersStore((s) => s.events);
+  const selectEvent = useEmbersStore((s) => s.selectEvent);
+  const setScreen = useEmbersStore((s) => s.setScreen);
+  const now = useClock();
+  const archived = events.filter((event) => event.archivedAt != null || eventPhase(event.details, now.getTime()) === "past");
+  return <div>
+    <div className="relative flex h-11 items-center"><button type="button" onClick={onBack} className="flex items-center text-[17px] text-[#0A84FF]"><ChevronLeft size={22} />Настройки</button><h2 className="absolute inset-x-24 text-center text-[17px] font-semibold">Архив</h2></div>
+    <p className="mt-3 px-1 text-[13px] leading-5 text-white/45">События в архиве хранятся 7 дней, затем архив очищается.</p>
+    {!archived.length && <p className="mt-8 text-center text-[15px] text-white/45">Архив пуст</p>}
+    <div className="mt-4 space-y-2.5">{archived.map((event) => {
+      const days = archiveDaysLeft(event.details, now.getTime(), event.archivedAt);
+      const left = days <= 0 ? "Удалится сегодня" : `Ещё ${ruDays(days)}`;
+      return <button key={event.id} type="button" onClick={() => { selectEvent(event.id); setScreen("live"); }} className="flex w-full items-center gap-3 rounded-[22px] bg-[#2c2c2e] px-4 py-3 text-left">
+        <span className="min-w-0 flex-1"><b className="block truncate text-[17px] font-semibold">{event.details.title || "Без названия"}</b><small className="mt-0.5 block truncate text-[13px] text-white/45">{eventWhen(event.details)}</small><small className="mt-0.5 block text-[13px] text-white/45">{left}</small></span>
+        <EventStatusBadge phase="past" size="board" />
+      </button>;
+    })}</div>
+  </div>;
+}
+
 function AccountSheet() {
   const close = useEmbersStore((s) => s.closeSheet);
   const setScreen = useEmbersStore((s) => s.setScreen);
   const prefs = useEmbersStore((s) => s.accountPrefs);
   const setPref = useEmbersStore((s) => s.setAccountPref);
-  const locationCount = useEmbersStore((s) => s.locationGroups.reduce((sum, group) => sum + group.locations.length, 0));
-  const [page, setPage] = useState<"root" | "notifications" | "calendar" | "email" | "privacy" | "help" | "terms" | "locations">("root");
+  const locationCount = useEmbersStore((s) => focusedEvent(s).locationGroups.reduce((sum, group) => sum + group.locations.length, 0));
+  const now = useClock();
+  const events = useEmbersStore((s) => s.events);
+  const archiveCount = events.filter((event) => event.archivedAt != null || eventPhase(event.details, now.getTime()) === "past").length;
+  const [page, setPage] = useState<"root" | "notifications" | "calendar" | "email" | "privacy" | "help" | "terms" | "locations" | "archive">("root");
   const pages = {
     notifications: { title: "Уведомления", key: "notifications" as const, text: "Сообщения команды, смена статуса и напоминания о ваших сменах." },
     calendar: { title: "Календарь", key: "calendar" as const, text: "Событие появится в календаре телефона, когда синхронизация будет подключена." },
@@ -1035,6 +1613,7 @@ function AccountSheet() {
     </div>;
   }
   if (page === "locations") return <PresetLocationsPage onBack={() => setPage("root")} />;
+  if (page === "archive") return <ArchivePage onBack={() => setPage("root")} />;
   if (page === "privacy" || page === "help" || page === "terms") {
     const copy = {
       privacy: ["Конфиденциальность", "Embers хранит событие, команду и расписание на этом устройстве. В демо-версии данные никуда не отправляются."],
@@ -1051,6 +1630,8 @@ function AccountSheet() {
     <div className="relative flex h-11 items-center justify-center"><h2 className="text-[17px] font-semibold">Настройки</h2><div className="absolute right-0"><CircleButton onClick={close} light><Check size={20} /></CircleButton></div></div>
     <div className="mt-3 flex items-center gap-3 rounded-[22px] bg-[#2c2c2e] px-4 py-3.5"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#9c613d] text-base font-semibold">ВФ</span><div className="min-w-0"><p className="text-[17px] font-semibold">Вадим Филатов</p><p className="truncate text-[15px] text-white/45">{accountEmail}</p></div></div>
     <p className="mt-2 px-4 text-[13px] leading-5 text-white/45">Вы вошли с Apple ID. Имя и фото можно сменить, когда будете отвечать на приглашение.</p>
+    <p className="mb-2 ml-4 mt-5 text-[15px] text-white/50">События</p>
+    <button type="button" onClick={() => setPage("archive")} className="flex h-[54px] w-full items-center rounded-[22px] bg-[#2c2c2e] px-4 text-left text-[17px]">Архив<span className="ml-auto text-white/45">{archiveCount}</span><ChevronRight size={18} className="ml-1 text-white/30" /></button>
     <div className="mt-4 space-y-2.5">
       <button type="button" onClick={() => setPage("notifications")} className="flex h-[54px] w-full items-center rounded-[22px] bg-[#2c2c2e] px-4 text-left text-[17px]">Уведомления<span className="ml-auto text-white/45">{stateLabel(prefs.notifications)}</span><ChevronRight size={18} className="ml-1 text-white/30" /></button>
       <button type="button" onClick={() => setPage("calendar")} className="flex h-[54px] w-full items-center rounded-[22px] bg-[#2c2c2e] px-4 text-left text-[17px]">Календарь<span className="ml-auto text-white/45">{stateLabel(prefs.calendar)}</span><ChevronRight size={18} className="ml-1 text-white/30" /></button>
@@ -1092,10 +1673,18 @@ function Sheets() {
   return <Drawer.Root open={sheet!==null} onOpenChange={(v)=>!v&&close()} shouldScaleBackground><Drawer.Portal><Drawer.Overlay className="fixed inset-0 z-[150] bg-black/50" /><Drawer.Content className={cn("fixed inset-x-0 bottom-0 z-[160] mx-auto max-w-[393px] overflow-y-auto rounded-t-[38px] bg-[#1c1c1e] px-4 pb-8 outline-none",tall?"h-[calc(100dvh-56px)] max-h-[836px]":heights[sheet??""]??"h-[70dvh]")}><Drawer.Title className="sr-only">{sheet}</Drawer.Title><i className="sticky top-1.5 z-20 mx-auto block h-[5px] w-[37px] rounded bg-[#7f7f7f80]" />{sheet === "account" ? <div className="pt-10">{content.account}</div> : sheet && content[sheet]}</Drawer.Content></Drawer.Portal></Drawer.Root>;
 }
 
+function ArchiveSweep() {
+  const pruneArchive = useEmbersStore((s) => s.pruneArchive);
+  const now = useClock();
+  useEffect(() => { pruneArchive(now.getTime()); }, [now, pruneArchive]);
+  return null;
+}
+
 export default function EmbersApp() {
   const screen = useEmbersStore((s) => s.screen);
   const views = {auth:<AuthScreen/>,hub:<EventsHub/>,create:<CreateEvent/>,live:<LiveBoard/>,schedule:<ScheduleScreen/>};
   return <main className="grid min-h-dvh place-items-center overflow-hidden bg-[#080402]">
+    <ArchiveSweep />
     <div data-vaul-drawer-wrapper="" className="phone-frame relative w-full overflow-hidden bg-black text-white">
       <div key={screen} className={cn("no-scrollbar h-full", screen === "create" || screen === "schedule" ? "overflow-hidden" : "overflow-y-auto")}><div className={cn("relative", screen === "create" || screen === "schedule" ? "h-full" : "min-h-full")}>{views[screen]}</div></div>
     </div><Sheets /><FrameNotice />

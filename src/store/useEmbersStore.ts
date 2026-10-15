@@ -116,40 +116,52 @@ export const team: Member[] = [
   { id: "ilya", initials: "ИП", name: "Илья Петров", role: "Звук", color: "#8B5CF6", status: "gathering", spot: "Гримвагон", currentTask: "сбор 5 мин", next: "19:10 · Саундчек", phone: "+79031234505", coords: { x: 86, y: 78 } },
 ];
 
+export type EventRecord = {
+  id: string;
+  code: string;
+  details: EventDetails;
+  team: Member[];
+  schedules: Record<string, ScheduleBlock[]>;
+  memberRoles: Record<string, string>;
+  openRoles: string[];
+  programFiles: ProgramFile[];
+  locationGroups: LocationGroup[];
+  myStatus: Status;
+  shareLocation: boolean;
+  archivedAt: number | null;
+};
+
 type Store = {
   screen: Screen;
   sheet: Sheet;
-  hasEvents: boolean;
   selectedMemberId: string;
   teamFilter: "all" | Status;
-  myStatus: Status;
-  shareLocation: boolean;
   joined: boolean;
   joinCode: string;
   joinRole: string;
   joinError: string;
-  openRoles: string[];
   profilePhone: string;
   notice: string;
-  event: EventDetails;
-  draft: EventDetails;
-  eventCreated: boolean;
+  events: EventRecord[];
+  activeEventId: string;
+  draftEvent: EventRecord | null;
   scheduleOrigin: "live" | "invite";
-  schedules: Record<string, ScheduleBlock[]>;
-  memberRoles: Record<string, string>;
-  programFiles: ProgramFile[];
-  locationGroups: LocationGroup[];
+  scheduleReturn: "live" | "create";
   accountPrefs: { notifications: boolean; calendar: boolean; emailUpdates: boolean };
   setScreen: (screen: Screen) => void;
   openSheet: (sheet: Sheet, memberId?: string) => void;
   closeSheet: () => void;
-  setHasEvents: (value: boolean) => void;
+  selectEvent: (id: string) => void;
+  archiveEvent: (id: string) => void;
+  deleteEvent: (id: string) => void;
+  pruneArchive: (now: number) => void;
   updateMyStatus: (status: Status) => void;
   filterTeam: (filter: "all" | Status) => void;
   toggleShareLocation: () => void;
   setJoinCode: (code: string) => void;
   setJoinRole: (role: string) => void;
   addOpenRole: (role: string) => void;
+  addTeamMember: (name: string, role: string) => void;
   setProfilePhone: (phone: string) => void;
   setNotice: (notice: string) => void;
   joinByCode: (code?: string) => boolean;
@@ -189,7 +201,60 @@ export function eventWhen(event: EventDetails) {
 }
 
 export function eventPlace(event: EventDetails) {
-  return event.zone ? `${event.venue} · ${event.zone}` : event.venue;
+  const name = event.zone.trim();
+  if (name && event.venue) return `${name} · ${event.venue}`;
+  return name || event.venue;
+}
+
+const dayMs = 24 * 60 * 60 * 1000;
+export const archiveLifetime = 7 * dayMs;
+export type EventPhase = "live" | "upcoming" | "past";
+
+function clockParts(value: string) {
+  const match = /^(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return null;
+  return { hours, minutes };
+}
+
+export function eventWindow(event: EventDetails) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(event.date);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const startOfDay = new Date(year, month - 1, day).getTime();
+  if (event.allDay) return { start: startOfDay, end: startOfDay + dayMs };
+  const startClock = clockParts(event.time) ?? { hours: 0, minutes: 0 };
+  const start = new Date(year, month - 1, day, startClock.hours, startClock.minutes).getTime();
+  const endClock = clockParts(event.endTime);
+  if (!endClock) return { start, end: startOfDay + dayMs };
+  let end = new Date(year, month - 1, day, endClock.hours, endClock.minutes).getTime();
+  if (end <= start) end += dayMs;
+  return { start, end };
+}
+
+export function eventPhase(event: EventDetails, now: number): EventPhase {
+  const window = eventWindow(event);
+  if (!window || now < window.start) return "upcoming";
+  if (now < window.end) return "live";
+  return "past";
+}
+
+export function archiveDaysLeft(event: EventDetails, now: number, archivedAt?: number | null) {
+  if (archivedAt != null) return Math.max(0, Math.ceil((archivedAt + archiveLifetime - now) / dayMs));
+  const window = eventWindow(event);
+  if (!window) return 7;
+  return Math.max(0, Math.ceil((window.end + archiveLifetime - now) / dayMs));
+}
+
+export function archiveExpired(event: EventDetails, now: number, archivedAt?: number | null) {
+  if (archivedAt != null) return now >= archivedAt + archiveLifetime;
+  const window = eventWindow(event);
+  if (!window) return false;
+  return now >= window.end + archiveLifetime;
 }
 
 export const presetColors = ["#ff3b30", "#ff6b00", "#ffcc00", "#34c759", "#007aff", "#5e5ce6", "#af52de", "#ff2d55"];
@@ -205,43 +270,174 @@ const initialSchedule: ScheduleBlock[] = [
   { id: "photo", location: "Фотозона", task: "Подготовить финальный свет для группового фото", time: "19:40 – 20:20", color: "#8B5CF6" },
 ];
 
+function cloneGroups(groups: LocationGroup[]) {
+  return groups.map((group) => ({ ...group, locations: group.locations.map((location) => ({ ...location })) }));
+}
+
+function eventCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  return Array.from({ length: 6 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("");
+}
+
+function blankRecord(code: string): EventRecord {
+  return {
+    id: `event-${Date.now()}`,
+    code,
+    details: { ...blankDraft },
+    team: [],
+    schedules: { vadim: [] },
+    memberRoles: { vadim: "Организатор" },
+    openRoles: [],
+    programFiles: [],
+    locationGroups: cloneGroups(initialLocationGroups),
+    myStatus: "on_site",
+    shareLocation: true,
+    archivedAt: null,
+  };
+}
+
+const demoRecord: EventRecord = {
+  id: "gorodskoe-okno",
+  code: "K7Q2X9",
+  details: { ...demoEvent },
+  team: team.map((member) => ({ ...member, coords: { ...member.coords } })),
+  schedules: {
+    kostya: initialSchedule.map((block) => ({ ...block })),
+    kirill: [],
+    anya: [],
+    masha: [],
+    ilya: [],
+    vadim: [],
+  },
+  memberRoles: { vadim: "Организатор", kostya: "Свет", kirill: "Техник", anya: "Видео", masha: "Фото", ilya: "Звук" },
+  openRoles: [],
+  programFiles: [],
+  locationGroups: cloneGroups(initialLocationGroups),
+  myStatus: "on_site",
+  shareLocation: true,
+  archivedAt: null,
+};
+
+type FocusState = Pick<Store, "screen" | "scheduleOrigin" | "draftEvent" | "events" | "activeEventId">;
+
+export function focusedEvent(state: FocusState) {
+  const editing = Boolean(state.draftEvent) && (state.screen === "create" || (state.screen === "schedule" && state.scheduleOrigin === "invite"));
+  if (editing && state.draftEvent) return state.draftEvent;
+  return state.events.find((event) => event.id === state.activeEventId) ?? state.events[0] ?? demoRecord;
+}
+
+function withFocus(state: FocusState, change: (event: EventRecord) => EventRecord) {
+  if (state.draftEvent && (state.screen === "create" || (state.screen === "schedule" && state.scheduleOrigin === "invite"))) {
+    return { draftEvent: change(state.draftEvent) };
+  }
+  return { events: state.events.map((event) => event.id === state.activeEventId ? change(event) : event) };
+}
+
+function onBoard(event: EventRecord, now: number) {
+  return event.archivedAt == null && eventPhase(event.details, now) !== "past";
+}
+
+function boardNeighbor(events: EventRecord[], id: string, now: number) {
+  const board = events.filter((event) => onBoard(event, now));
+  const index = board.findIndex((event) => event.id === id);
+  return (board[index + 1] ?? board[index - 1])?.id;
+}
+
 export const useEmbersStore = create<Store>((set) => ({
   screen: "auth",
   sheet: null,
-  hasEvents: true,
   selectedMemberId: "kostya",
   teamFilter: "all",
-  myStatus: "on_site",
-  shareLocation: true,
   joined: false,
   joinCode: "",
   joinRole: "Видео",
   joinError: "",
-  openRoles: [],
   profilePhone: "",
   notice: "",
-  event: { ...demoEvent },
-  draft: { ...blankDraft },
-  eventCreated: false,
+  events: [demoRecord],
+  activeEventId: demoRecord.id,
+  draftEvent: null,
   scheduleOrigin: "invite",
-  schedules: { kostya: initialSchedule, kirill: [], anya: [], masha: [], ilya: [], vadim: [] },
-  memberRoles: { vadim: "Организатор", kostya: "Свет", kirill: "Техник", anya: "Видео", masha: "Фото", ilya: "Звук" },
-  programFiles: [],
-  locationGroups: initialLocationGroups,
+  scheduleReturn: "create",
   accountPrefs: { notifications: true, calendar: false, emailUpdates: false },
-  setScreen: (screen) => set({ screen, sheet: null }),
+  setScreen: (screen) => set((state) => ({
+    screen,
+    sheet: null,
+    ...(state.screen === "create" && screen !== "create" && screen !== "schedule" ? { draftEvent: null } : {}),
+  })),
   openSheet: (sheet, memberId) => set({ sheet, ...(memberId ? { selectedMemberId: memberId } : {}) }),
   closeSheet: () => set({ sheet: null }),
-  setHasEvents: (hasEvents) => set({ hasEvents }),
-  updateMyStatus: (myStatus) => set({ myStatus, sheet: null }),
+  selectEvent: (id) => set((state) => state.events.some((event) => event.id === id) ? { activeEventId: id } : state),
+  archiveEvent: (id) => set((state) => {
+    const now = Date.now();
+    const current = state.events.find((event) => event.id === id);
+    if (!current || current.archivedAt != null) return state;
+    const next = state.activeEventId === id ? boardNeighbor(state.events, id, now) : undefined;
+    return {
+      events: state.events.map((event) => event.id === id ? { ...event, archivedAt: now } : event),
+      ...(next ? { activeEventId: next } : {}),
+      notice: "Событие в архиве",
+    };
+  }),
+  deleteEvent: (id) => set((state) => {
+    if (!state.events.some((event) => event.id === id)) return state;
+    const now = Date.now();
+    const next = state.activeEventId === id ? boardNeighbor(state.events, id, now) : undefined;
+    const events = state.events.filter((event) => event.id !== id);
+    const activeEventId = next && events.some((event) => event.id === next) ? next : events[0]?.id ?? state.activeEventId;
+    return { events, activeEventId, notice: "Событие удалено" };
+  }),
+  pruneArchive: (now) => set((state) => {
+    const events = state.events.filter((event) => !archiveExpired(event.details, now, event.archivedAt));
+    if (events.length === state.events.length) return state;
+    const activeEventId = events.some((event) => event.id === state.activeEventId)
+      ? state.activeEventId
+      : events.find((event) => onBoard(event, now))?.id ?? events[0]?.id ?? state.activeEventId;
+    return { events, activeEventId };
+  }),
+  updateMyStatus: (myStatus) => set((state) => ({ ...withFocus(state, (event) => ({ ...event, myStatus })), sheet: null })),
   filterTeam: (teamFilter) => set({ teamFilter }),
-  toggleShareLocation: () => set((state) => ({ shareLocation: !state.shareLocation })),
+  toggleShareLocation: () => set((state) => withFocus(state, (event) => ({ ...event, shareLocation: !event.shareLocation }))),
   setJoinCode: (code) => set({ joinCode: code.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6), joinError: "" }),
   setJoinRole: (joinRole) => set({ joinRole }),
   addOpenRole: (role) => set((state) => {
     const name = role.trim();
-    if (!name || state.openRoles.some((item) => item.toLowerCase() === name.toLowerCase())) return state;
-    return { openRoles: [...state.openRoles, name] };
+    const current = focusedEvent(state);
+    if (!name || current.openRoles.some((item) => item.toLowerCase() === name.toLowerCase())) return state;
+    return withFocus(state, (event) => ({ ...event, openRoles: [...event.openRoles, name] }));
+  }),
+  addTeamMember: (name, role) => set((state) => {
+    const person = name.trim().replace(/\s+/g, " ");
+    if (person.length < 2) return { notice: "Введите имя участника" };
+    const current = focusedEvent(state);
+    const job = role.trim() || "Участник";
+    const id = `member-${Date.now()}`;
+    const colors = ["#3B82F6", "#06B6D4", "#EF4444", "#10B981", "#8B5CF6", "#F59E0B", "#EC4899", "#FF6B00"];
+    const pins = [
+      { x: 30, y: 36 }, { x: 68, y: 40 }, { x: 24, y: 72 }, { x: 74, y: 66 },
+      { x: 48, y: 58 }, { x: 86, y: 48 }, { x: 40, y: 80 }, { x: 58, y: 28 },
+    ];
+    const parts = person.split(" ");
+    const member: Member = {
+      id,
+      initials: ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "•",
+      name: person,
+      role: job,
+      color: colors[current.team.length % colors.length],
+      status: "gathering",
+      spot: "Ещё не на площадке",
+      currentTask: "ожидает",
+      next: "Расписание не задано",
+      phone: "",
+      coords: pins[current.team.length % pins.length],
+    };
+    return withFocus(state, (event) => ({
+      ...event,
+      team: [...event.team, member],
+      schedules: { ...event.schedules, [id]: [] },
+      memberRoles: { ...event.memberRoles, [id]: job },
+      openRoles: event.openRoles.filter((item) => item.toLowerCase() !== job.toLowerCase()),
+    }));
   }),
   setProfilePhone: (profilePhone) => set({ profilePhone }),
   setNotice: (notice) => set({ notice }),
@@ -251,28 +447,35 @@ export const useEmbersStore = create<Store>((set) => ({
       set({ joinCode: value, joinError: "Введите 6 символов" });
       return false;
     }
-    if (value !== "K7Q2X9") {
+    const found = useEmbersStore.getState().events.find((event) => event.code === value);
+    if (!found) {
       set({ joinError: "Событие с таким кодом не найдено" });
       return false;
     }
-    set({ joined: true, joinError: "", sheet: null, screen: "live", hasEvents: true });
+    set({ joined: true, joinError: "", sheet: null, screen: "live", activeEventId: found.id });
     return true;
   },
-  updateDraft: (patch) => set((state) => ({ draft: { ...state.draft, ...patch } })),
-  toggleAllDay: () => set((state) => ({ draft: { ...state.draft, allDay: !state.draft.allDay } })),
+  updateDraft: (patch) => set((state) => state.draftEvent ? { draftEvent: { ...state.draftEvent, details: { ...state.draftEvent.details, ...patch } } } : state),
+  toggleAllDay: () => set((state) => state.draftEvent ? { draftEvent: { ...state.draftEvent, details: { ...state.draftEvent.details, allDay: !state.draftEvent.details.allDay } } } : state),
   createEvent: () => {
-    const draft = useEmbersStore.getState().draft;
-    if (!eventTitleSchema.safeParse(draft.title).success) { set({ notice: "Добавьте название события" }); return; }
-    if (!draft.date) { set({ notice: "Выберите дату события" }); return; }
-    if (!draft.venue) { set({ notice: "Выберите локацию" }); return; }
-    set({ event: { ...draft }, draft: { ...blankDraft }, eventCreated: true, hasEvents: true, screen: "hub", sheet: null });
+    const draft = useEmbersStore.getState().draftEvent;
+    if (!draft) return;
+    if (!eventTitleSchema.safeParse(draft.details.title).success) { set({ notice: "Добавьте название события" }); return; }
+    if (!draft.details.date) { set({ notice: "Выберите дату события" }); return; }
+    if (!draft.details.venue) { set({ notice: "Выберите локацию" }); return; }
+    set((state) => ({ events: [...state.events, draft], activeEventId: draft.id, draftEvent: null, screen: "hub", sheet: null }));
   },
-  startCreate: () => set({ screen: "create", sheet: null, draft: { ...blankDraft } }),
+  startCreate: () => set((state) => {
+    const taken = state.events.map((event) => event.code);
+    let code = eventCode();
+    while (taken.includes(code)) code = eventCode();
+    return { screen: "create", sheet: null, draftEvent: blankRecord(code) };
+  }),
   addScheduleBlock: (location) => useEmbersStore.getState().insertScheduleBlock(location, Number.MAX_SAFE_INTEGER),
   insertScheduleBlock: (location, index) => set((state) => {
     const name = location.trim();
     if (!name) return state;
-    const current = state.schedules[state.selectedMemberId] ?? [];
+    const current = focusedEvent(state).schedules[state.selectedMemberId] ?? [];
     const at = Math.max(0, Math.min(index, current.length));
     const next = [...current];
     next.splice(at, 0, {
@@ -283,67 +486,77 @@ export const useEmbersStore = create<Store>((set) => ({
       travel: 10,
       color: ["#FF5A1F", "#3B82F6", "#A855F7", "#10B981"][current.length % 4],
     });
-    return { schedules: { ...state.schedules, [state.selectedMemberId]: next } };
+    return withFocus(state, (event) => ({ ...event, schedules: { ...event.schedules, [state.selectedMemberId]: next } }));
   }),
   reorderScheduleBlocks: (blocks) => set((state) => {
-    const current = state.schedules[state.selectedMemberId] ?? [];
+    const current = focusedEvent(state).schedules[state.selectedMemberId] ?? [];
     const ids = new Set(current.map((block) => block.id));
     if (blocks.length !== current.length || blocks.some((block) => !ids.has(block.id))) return state;
-    return { schedules: { ...state.schedules, [state.selectedMemberId]: blocks } };
+    return withFocus(state, (event) => ({ ...event, schedules: { ...event.schedules, [state.selectedMemberId]: blocks } }));
   }),
-  removeScheduleBlock: (id) => set((state) => ({
-    schedules: { ...state.schedules, [state.selectedMemberId]: (state.schedules[state.selectedMemberId] ?? []).filter((block) => block.id !== id) },
-  })),
+  removeScheduleBlock: (id) => set((state) => withFocus(state, (event) => ({
+    ...event,
+    schedules: { ...event.schedules, [state.selectedMemberId]: (event.schedules[state.selectedMemberId] ?? []).filter((block) => block.id !== id) },
+  }))),
   updateScheduleBlock: (id, patch) => set((state) => {
     const task = patch.task?.trim();
     const time = patch.time?.trim();
     const travel = typeof patch.travel === "number" && patch.travel >= 0 ? Math.min(240, Math.round(patch.travel)) : undefined;
-    return { schedules: { ...state.schedules, [state.selectedMemberId]: (state.schedules[state.selectedMemberId] ?? []).map((block) => block.id === id ? { ...block, ...(task ? { task } : {}), ...(time ? { time } : {}), ...(travel !== undefined ? { travel } : {}) } : block) } };
+    return withFocus(state, (event) => ({
+      ...event,
+      schedules: { ...event.schedules, [state.selectedMemberId]: (event.schedules[state.selectedMemberId] ?? []).map((block) => block.id === id ? { ...block, ...(task ? { task } : {}), ...(time ? { time } : {}), ...(travel !== undefined ? { travel } : {}) } : block) },
+    }));
   }),
-  openSchedule: (memberId, origin = "invite") => set({ selectedMemberId: memberId, screen: "schedule", sheet: null, scheduleOrigin: origin }),
+  openSchedule: (memberId, origin = "invite") => set((state) => ({ selectedMemberId: memberId, screen: "schedule", sheet: null, scheduleOrigin: origin, scheduleReturn: state.screen === "live" ? "live" : "create" })),
   setMemberRole: (id, role) => set((state) => {
     const name = role.trim();
     if (!name) return state;
-    return { memberRoles: { ...state.memberRoles, [id]: name } };
+    return withFocus(state, (event) => ({ ...event, memberRoles: { ...event.memberRoles, [id]: name } }));
   }),
-  addProgramFile: (file) => set((state) => ({ programFiles: [...state.programFiles, file] })),
-  removeProgramFile: (id) => set((state) => ({ programFiles: state.programFiles.filter((file) => file.id !== id) })),
+  addProgramFile: (file) => set((state) => withFocus(state, (event) => ({ ...event, programFiles: [...event.programFiles, file] }))),
+  removeProgramFile: (id) => set((state) => withFocus(state, (event) => ({ ...event, programFiles: event.programFiles.filter((file) => file.id !== id) }))),
   addLocationGroup: (name) => set((state) => {
     const title = name.trim();
+    const groups = focusedEvent(state).locationGroups;
     if (!title) return state;
-    if (state.locationGroups.some((group) => group.name.toLowerCase() === title.toLowerCase())) return { notice: "Такая группа уже есть" };
-    return { locationGroups: [...state.locationGroups, { name: title, locations: [] }] };
+    if (groups.some((group) => group.name.toLowerCase() === title.toLowerCase())) return { notice: "Такая группа уже есть" };
+    return withFocus(state, (event) => ({ ...event, locationGroups: [...event.locationGroups, { name: title, locations: [] }] }));
   }),
-  removeLocationGroup: (name) => set((state) => ({ locationGroups: state.locationGroups.filter((group) => group.name !== name) })),
+  removeLocationGroup: (name) => set((state) => withFocus(state, (event) => ({ ...event, locationGroups: event.locationGroups.filter((group) => group.name !== name) }))),
   addPresetLocation: (group, name) => set((state) => {
     const title = name.trim();
+    const groups = focusedEvent(state).locationGroups;
     if (!title) return state;
-    const current = state.locationGroups.find((item) => item.name === group);
+    const current = groups.find((item) => item.name === group);
     if (!current) return state;
     if (current.locations.some((location) => location.name.toLowerCase() === title.toLowerCase())) return { notice: "Такая локация уже есть" };
-    return {
-      locationGroups: state.locationGroups.map((item) => item.name === group ? { ...item, locations: [...item.locations, { id: `preset-${Date.now()}`, name: title, color: presetColors[item.locations.length % presetColors.length], icon: "sparkles" }] } : item),
-    };
+    return withFocus(state, (event) => ({
+      ...event,
+      locationGroups: event.locationGroups.map((item) => item.name === group ? { ...item, locations: [...item.locations, { id: `preset-${Date.now()}`, name: title, color: presetColors[item.locations.length % presetColors.length], icon: "sparkles" as const }] } : item),
+    }));
   }),
   updatePresetLocation: (id, patch) => set((state) => {
-    const source = state.locationGroups.find((group) => group.locations.some((location) => location.id === id));
+    const groups = focusedEvent(state).locationGroups;
+    const source = groups.find((group) => group.locations.some((location) => location.id === id));
     const current = source?.locations.find((location) => location.id === id);
     if (!source || !current) return state;
     const nextGroup = patch.group?.trim() || source.name;
-    if (!state.locationGroups.some((group) => group.name === nextGroup)) return state;
+    if (!groups.some((group) => group.name === nextGroup)) return state;
     const icon = patch.icon && locationIconNames.includes(patch.icon) ? patch.icon : current.icon;
     const updated = { ...current, color: patch.color || current.color, icon };
-    return {
-      locationGroups: state.locationGroups.map((group) => {
+    return withFocus(state, (event) => ({
+      ...event,
+      locationGroups: event.locationGroups.map((group) => {
         if (source.name === nextGroup && group.name === source.name) return { ...group, locations: group.locations.map((location) => location.id === id ? updated : location) };
         if (group.name === source.name) return { ...group, locations: group.locations.filter((location) => location.id !== id) };
         if (group.name === nextGroup) return { ...group, locations: [...group.locations, updated] };
         return group;
       }),
-    };
+    }));
   }),
-  removePresetLocation: (group, id) => set((state) => ({
-    locationGroups: state.locationGroups.map((item) => item.name === group ? { ...item, locations: item.locations.filter((location) => location.id !== id) } : item),
-  })),
+  removePresetLocation: (group, id) => set((state) => withFocus(state, (event) => ({
+    ...event,
+    locationGroups: event.locationGroups.map((item) => item.name === group ? { ...item, locations: item.locations.filter((location) => location.id !== id) } : item),
+  }))),
   setAccountPref: (key, value) => set((state) => ({ accountPrefs: { ...state.accountPrefs, [key]: value } })),
 }));
