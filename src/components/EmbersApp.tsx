@@ -15,7 +15,9 @@ import {
 import {
   type EventPhase, type EventRecord, type LocationIcon, type Member, type ProgramFile, type ScheduleBlock, type Sheet, type Status, archiveDaysLeft, blankDraft, eventPhase, eventPlace, eventWhen, eventWindow, focusedEvent, formatDateLabel, locationIconNames, presetColors, statusMeta, useEmbersStore,
 } from "@/store/useEmbersStore";
+import type { Map as MapboxMap } from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
+import { notificationPermission, requestNotificationPermission, showNotification } from "@/notifications";
 
 const spring = { type: "spring" as const, stiffness: 380, damping: 30, mass: 0.8 };
 const cn = (...v: Array<string | false | null | undefined>) => v.filter(Boolean).join(" ");
@@ -30,7 +32,7 @@ const emptyBlocks: ScheduleBlock[] = [];
 const emptyFiles: ProgramFile[] = [];
 
 async function shareInvite(title: string, code: string) {
-  const url = `https://embers.app/j/${code}`;
+  const url = `https://amber.app/j/${code}`;
   if (navigator.share) {
     try {
       await navigator.share({ title, url });
@@ -133,7 +135,7 @@ function AuthScreen() {
       <div className="grid h-24 w-24 shrink-0 place-items-center rounded-[28px] border border-white/35 bg-white/15">
         <Asset src="/figma-flame.svg" className="h-12 w-12" />
       </div>
-      <h1 className="mt-7 text-display font-extrabold tracking-[-.02em]">Embers</h1>
+      <h1 className="mt-7 text-display font-extrabold tracking-[-.02em]">Amber</h1>
       <h2 className="mt-4 text-body font-semibold">Вся команда на одной карте</h2>
       <p className="mt-3 text-callout leading-5 text-[#ebebf599]">Кто где, что делает и сколько осталось —<br />в реальном времени на любом событии</p>
     </div>
@@ -452,6 +454,8 @@ function EventsHub() {
   </div>;
 }
 
+const mapStyle = "mapbox://styles/therealvadim/cmv9jobw2013801sgcb182g5m";
+
 function placeMark() {
   const mark = document.createElement("div");
   mark.style.cssText = "display:grid;width:22px;height:22px;place-items:center;border-radius:999px;border:3px solid #fff;background:#ff6b00;box-shadow:0 1px 4px rgba(0,0,0,.28)";
@@ -461,7 +465,28 @@ function placeMark() {
   return mark;
 }
 
-function LocationMap({ lat, lng }: { lat: number; lng: number }) {
+function enableBuildings(instance: MapboxMap) {
+  try { instance.setConfigProperty("basemap", "show3dObjects", true); } catch { /* стиль без конфигурации standard */ }
+  const hasExtrusion = (instance.getStyle()?.layers ?? []).some((layer) => layer.type === "fill-extrusion");
+  if (!hasExtrusion && instance.getSource("composite")) {
+    instance.addLayer({
+      id: "embers-buildings",
+      source: "composite",
+      "source-layer": "building",
+      filter: ["==", ["get", "extrude"], "true"],
+      type: "fill-extrusion",
+      minzoom: 14,
+      paint: {
+        "fill-extrusion-color": "#e7e2dc",
+        "fill-extrusion-height": ["interpolate", ["linear"], ["zoom"], 14, 0, 15.2, ["get", "height"]],
+        "fill-extrusion-base": ["coalesce", ["get", "min_height"], 0],
+        "fill-extrusion-opacity": 0.9,
+      },
+    });
+  }
+}
+
+function LocationMap({ lat, lng, label }: { lat: number; lng: number; label?: string }) {
   const nodeRef = useRef<HTMLDivElement>(null);
   const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
   const [expanded, setExpanded] = useState(false);
@@ -478,7 +503,7 @@ function LocationMap({ lat, lng }: { lat: number; lng: number }) {
       mapboxgl.accessToken = token;
       const instance = new mapboxgl.Map({
         container: node,
-        style: "mapbox://styles/therealvadim/cmv9jobw2013801sgcb182g5m",
+        style: mapStyle,
         center: [lng, lat],
         zoom: expanded ? 16.4 : 15.6,
         pitch: 62,
@@ -488,27 +513,8 @@ function LocationMap({ lat, lng }: { lat: number; lng: number }) {
       });
       instance.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
       new mapboxgl.Marker({ element: placeMark(), anchor: "center" }).setLngLat([lng, lat]).addTo(instance);
-      instance.once("style.load", () => {
-        if (!alive) return;
-        try { instance.setConfigProperty("basemap", "show3dObjects", true); } catch { /* стиль без конфигурации standard */ }
-        const hasExtrusion = (instance.getStyle()?.layers ?? []).some((layer) => layer.type === "fill-extrusion");
-        if (!hasExtrusion && instance.getSource("composite")) {
-          instance.addLayer({
-            id: "embers-buildings",
-            source: "composite",
-            "source-layer": "building",
-            filter: ["==", ["get", "extrude"], "true"],
-            type: "fill-extrusion",
-            minzoom: 14,
-            paint: {
-              "fill-extrusion-color": "#e7e2dc",
-              "fill-extrusion-height": ["interpolate", ["linear"], ["zoom"], 14, 0, 15.2, ["get", "height"]],
-              "fill-extrusion-base": ["coalesce", ["get", "min_height"], 0],
-              "fill-extrusion-opacity": 0.9,
-            },
-          });
-        }
-      });
+      if (label) new mapboxgl.Marker({ element: pinLabel(label), anchor: "bottom", offset: [0, -16] }).setLngLat([lng, lat]).addTo(instance);
+      instance.once("style.load", () => { if (alive) enableBuildings(instance); });
       if (!alive) {
         instance.remove();
         return;
@@ -519,7 +525,7 @@ function LocationMap({ lat, lng }: { lat: number; lng: number }) {
       alive = false;
       map?.remove();
     };
-  }, [expanded, lat, lng, token]);
+  }, [expanded, label, lat, lng, token]);
   if (!token) return <div className="mt-4 grid h-52 place-items-center rounded-[22px] bg-black/30 px-6 text-center text-caption leading-5 text-white/50">Добавьте ключ Mapbox, чтобы показать карту</div>;
   const view = <div className={expanded ? "absolute inset-0 z-40 bg-[#111]" : "relative h-full w-full"}>
     <div ref={nodeRef} className="h-full w-full" />
@@ -573,7 +579,7 @@ function CreateEvent() {
         <MapPin size={22} className="mx-auto text-[#8eb6ff]" />
         <p className="mt-2 text-body font-semibold leading-6">{placeTitle}</p>
         {placeDetail && <p className="mt-1 text-callout text-white/75">{placeDetail}</p>}
-        <LocationMap lat={draft.lat} lng={draft.lng} />
+        <LocationMap lat={draft.lat} lng={draft.lng} label={eventPlace(draft)} />
       </div>}
       <div className="mt-3 rounded-[32px] bg-[#1a040861] px-5 py-4 text-center">
         <p className="text-caption font-medium tracking-wide text-white/55">ДЛЯ КОМАНДЫ</p>
@@ -793,19 +799,215 @@ function Timeline() {
   </div>;
 }
 
+type GeoPoint = { lat: number; lng: number };
+
+function personMark(initials: string, color: string) {
+  const mark = document.createElement("button");
+  mark.type = "button";
+  mark.textContent = initials;
+  mark.style.cssText = `display:grid;width:30px;height:30px;place-items:center;border-radius:999px;border:2px solid #fff;background:${color};color:#fff;font:600 13px -apple-system,BlinkMacSystemFont,sans-serif;box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:pointer`;
+  return mark;
+}
+
+function userMark() {
+  const mark = document.createElement("div");
+  mark.setAttribute("aria-label", "Вы");
+  mark.style.cssText = "width:18px;height:18px;border-radius:999px;border:3px solid #fff;background:#0A84FF;box-shadow:0 0 0 7px rgba(10,132,255,.35)";
+  return mark;
+}
+
+function pinLabel(label: string) {
+  const mark = document.createElement("div");
+  mark.textContent = label;
+  mark.style.cssText = "max-width:168px;padding:4px 8px;border-radius:12px;background:rgba(0,0,0,.72);color:#fff;font:600 13px -apple-system,BlinkMacSystemFont,sans-serif;text-align:center;line-height:1.3";
+  return mark;
+}
+
+function memberPoint(member: Member, lat: number, lng: number): [number, number] {
+  const span = 0.0018;
+  return [lng + (member.coords.x / 100 - 0.5) * span, lat - (member.coords.y / 100 - 0.5) * span * 0.7];
+}
+
+function metersBetween(a: GeoPoint, b: GeoPoint) {
+  const dLat = (a.lat - b.lat) * 111320;
+  const dLng = (a.lng - b.lng) * 111320 * Math.cos(((a.lat + b.lat) / 2) * Math.PI / 180);
+  return Math.hypot(dLat, dLng);
+}
+
+function formatDistance(meters: number) {
+  if (meters < 1000) return `${Math.max(10, Math.round(meters / 10) * 10)} м`;
+  const digits = meters < 10000 ? 1 : 0;
+  return `${(meters / 1000).toFixed(digits).replace(".", ",")} км`;
+}
+
+function useMyLocation() {
+  const [point, setPoint] = useState<GeoPoint | null>(null);
+  const [status, setStatus] = useState<"pending" | "granted" | "denied" | "unavailable">("pending");
+  const setNotice = useEmbersStore((s) => s.setNotice);
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setStatus("unavailable");
+      setNotice("Геолокация недоступна");
+      return;
+    }
+    const watch = navigator.geolocation.watchPosition(
+      (position) => {
+        setStatus("granted");
+        setPoint({ lat: position.coords.latitude, lng: position.coords.longitude });
+      },
+      (error) => {
+        if (error.code !== error.PERMISSION_DENIED) return;
+        setStatus("denied");
+        setNotice("Разрешите доступ к геопозиции");
+      },
+      { enableHighAccuracy: true, maximumAge: 4000, timeout: 15000 },
+    );
+    return () => navigator.geolocation.clearWatch(watch);
+  }, [setNotice]);
+  return { point, status };
+}
+
+function TrackingMap({ lat, lng, address, members, user, expanded, onMember }: { lat: number; lng: number; address: string; members: Member[]; user: GeoPoint | null; expanded: boolean; onMember: (id: string) => void }) {
+  const nodeRef = useRef<HTMLDivElement>(null);
+  const onMemberRef = useRef(onMember);
+  const membersRef = useRef(members);
+  const userRef = useRef(user);
+  const syncUser = useRef<(point: GeoPoint | null) => void>(() => {});
+  onMemberRef.current = onMember;
+  membersRef.current = members;
+  userRef.current = user;
+  const memberKey = members.map((member) => `${member.id}:${member.coords.x}:${member.coords.y}`).join("|");
+  useEffect(() => {
+    const node = nodeRef.current;
+    const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+    if (!node || !token) return;
+    let map: { remove: () => void } | undefined;
+    let alive = true;
+    const markers: Array<{ remove: () => void }> = [];
+    void import("mapbox-gl").then((mod) => {
+      if (!alive || !node.isConnected) return;
+      const mapboxgl = mod.default;
+      mapboxgl.accessToken = token;
+      const instance = new mapboxgl.Map({
+        container: node,
+        style: mapStyle,
+        center: [lng, lat],
+        zoom: expanded ? 15.2 : 16,
+        pitch: expanded ? 55 : 40,
+        bearing: -24,
+        antialias: true,
+        cooperativeGestures: !expanded,
+        attributionControl: false,
+      });
+      instance.addControl(new mapboxgl.AttributionControl({ compact: true }));
+      if (expanded) instance.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
+      const people = membersRef.current;
+      const points: [number, number][] = [[lng, lat]];
+      markers.push(new mapboxgl.Marker({ element: placeMark(), anchor: "center" }).setLngLat([lng, lat]).addTo(instance));
+      if (address) markers.push(new mapboxgl.Marker({ element: pinLabel(address), anchor: "bottom", offset: [0, -16] }).setLngLat([lng, lat]).addTo(instance));
+      for (const member of people) {
+        const at = memberPoint(member, lat, lng);
+        points.push(at);
+        const element = personMark(member.initials, member.color);
+        element.addEventListener("click", (event) => {
+          event.stopPropagation();
+          onMemberRef.current(member.id);
+        });
+        markers.push(new mapboxgl.Marker({ element, anchor: "center" }).setLngLat(at).addTo(instance));
+      }
+      let userMarker: { setLngLat: (next: [number, number]) => void } | null = null;
+      let lastRoute: GeoPoint | null = null;
+      let ready = false;
+      const frameMap = (includeUser: GeoPoint | null, animate: boolean) => {
+        const box = [...points];
+        if (includeUser && (expanded || metersBetween(includeUser, { lat, lng }) < 12000)) box.push([includeUser.lng, includeUser.lat]);
+        instance.fitBounds(
+          [[Math.min(...box.map((point) => point[0])), Math.min(...box.map((point) => point[1]))], [Math.max(...box.map((point) => point[0])), Math.max(...box.map((point) => point[1]))]],
+          { padding: expanded ? 72 : 28, maxZoom: expanded ? 16.2 : 16.6, duration: animate ? 700 : 0 },
+        );
+      };
+      const drawRoute = async (from: GeoPoint) => {
+        const geometry: { type: "LineString"; coordinates: [number, number][] } = { type: "LineString", coordinates: [[from.lng, from.lat], [lng, lat]] };
+        try {
+          const response = await fetch(`https://api.mapbox.com/directions/v5/mapbox/driving/${from.lng},${from.lat};${lng},${lat}?geometries=geojson&overview=full&access_token=${token}`);
+          const data = await response.json() as { routes?: Array<{ geometry?: { coordinates: [number, number][] } }> };
+          const line = data.routes?.[0]?.geometry?.coordinates;
+          if (line?.length) geometry.coordinates = line;
+        } catch { /* остаётся прямая линия до площадки */ }
+        if (!alive) return;
+        const feature = { type: "Feature", properties: {}, geometry };
+        const source = instance.getSource("embers-route") as { setData: (data: object) => void } | undefined;
+        if (source) source.setData(feature);
+        else {
+          instance.addSource("embers-route", { type: "geojson", data: feature });
+          instance.addLayer({ id: "embers-route", type: "line", source: "embers-route", paint: { "line-color": "#ff6b00", "line-width": 4, "line-opacity": 0.9 } });
+        }
+      };
+      const placeUser = (point: GeoPoint | null) => {
+        if (!ready || !point) return;
+        if (!userMarker) userMarker = new mapboxgl.Marker({ element: userMark(), anchor: "center" }).setLngLat([point.lng, point.lat]).addTo(instance);
+        else userMarker.setLngLat([point.lng, point.lat]);
+        const first = lastRoute == null;
+        if (lastRoute == null || metersBetween(lastRoute, point) > 80) {
+          lastRoute = point;
+          void drawRoute(point);
+        }
+        if (first) frameMap(point, true);
+      };
+      syncUser.current = placeUser;
+      instance.once("style.load", () => {
+        if (!alive) return;
+        enableBuildings(instance);
+        ready = true;
+        frameMap(userRef.current, false);
+        placeUser(userRef.current);
+        requestAnimationFrame(() => instance.resize());
+      });
+      if (!alive) {
+        instance.remove();
+        return;
+      }
+      map = instance;
+    });
+    return () => {
+      alive = false;
+      syncUser.current = () => {};
+      markers.forEach((marker) => marker.remove());
+      map?.remove();
+    };
+  }, [address, expanded, lat, lng, memberKey]);
+  useEffect(() => { syncUser.current(user); }, [user]);
+  if (!process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN) return <div className="grid h-full place-items-center px-6 text-center text-caption leading-5 text-white/50">Добавьте ключ Mapbox, чтобы показать карту</div>;
+  return <div className={expanded ? "absolute inset-0 bg-[#111]" : "relative h-full w-full"}><div ref={nodeRef} className="h-full w-full" /></div>;
+}
+
 function MapCard() {
   const open = useEmbersStore((s) => s.openSheet);
-  const team = useEmbersStore((s) => focusedEvent(s).team);
+  const record = useEmbersStore(focusedEvent);
+  const team = record.team;
+  const event = record.details;
+  const location = useMyLocation();
+  const [expanded, setExpanded] = useState(false);
+  const [frame, setFrame] = useState<HTMLElement | null>(null);
+  useEffect(() => { setFrame(document.querySelector<HTMLElement>(".phone-frame")); }, []);
   const onSite = team.filter((member) => member.status === "on_site").length;
   const inTransit = team.filter((member) => member.status === "in_transit").length;
+  const lat = event.lat ?? 55.8304;
+  const lng = event.lng ?? 37.6326;
+  const distance = location.point ? formatDistance(metersBetween(location.point, { lat, lng })) : null;
+  const chip = location.status === "granted" && distance ? `Вы · ${distance}` : location.status === "denied" ? "Геопозиция выключена" : location.status === "unavailable" ? "Геолокация недоступна" : "Запрашиваем геопозицию";
+  const address = eventPlace(event);
+  const view = <div className={expanded ? "absolute inset-0 z-40 bg-[#111]" : "relative h-full w-full"}>
+    <TrackingMap lat={lat} lng={lng} address={address} members={team} user={location.point} expanded={expanded} onMember={(id) => open("member", id)} />
+    <span className={cn("pointer-events-none absolute z-20 rounded-full bg-black/70 text-caption font-semibold", expanded ? "left-5 top-[calc(64px+var(--chrome-shift))] px-3 py-1" : "left-2 top-2 px-2 py-1")}>{chip}</span>
+    {expanded
+      ? <button type="button" aria-label="Закрыть карту" onClick={() => setExpanded(false)} className="absolute left-5 top-(--chrome-top) z-20 grid h-11 w-11 place-items-center rounded-full bg-black/55 text-white backdrop-blur-xl"><X size={20} /></button>
+      : <button type="button" aria-label="Открыть карту" onClick={() => setExpanded(true)} className="absolute inset-0 z-10" />}
+  </div>;
   return <div className="rounded-[28px] bg-white/10 p-5"><h3 className="text-body font-bold">Карта</h3><p className="mt-2 text-caption text-white/45">{onSite} на площадке · {inTransit} в пути</p>
-    <div className="relative mt-5 h-[164px] overflow-hidden rounded-[18px] bg-[#26262b]">
-      <i className="absolute -left-5 top-20 h-2 w-[420px] rotate-[8deg] bg-[#3a3a42]" /><i className="absolute left-28 -top-10 h-[260px] w-3 rotate-[8deg] bg-[#3a3a42]" /><i className="absolute right-14 -top-10 h-[260px] w-2 -rotate-12 bg-[#3a3a42]" />
-      <span className="absolute right-10 top-3 h-[70px] w-[110px] rounded-[18px] bg-green-500/20" />
-      {team.some((member) => member.spot.includes("Сцена")) && <span className="absolute left-[168px] top-[72px] rounded-full bg-black/70 px-2 py-1 text-caption font-semibold">Сцена А</span>}
-      {team.map((m) => <button key={m.id} onClick={() => open("member", m.id)} style={{ left: `${m.coords.x}%`, top: `${m.coords.y}%` }} className="absolute -translate-x-1/2 -translate-y-1/2"><Avatar member={m} size={30} /></button>)}
-    </div>
-    <button className="mt-5 flex h-10 w-full items-center justify-center gap-2 rounded-full bg-white/15 text-caption font-semibold"><Asset src="/figma-nav.svg" className="h-4 w-4" />Маршрут и карта</button>
+    <div className="relative mt-5 h-[164px] overflow-hidden rounded-[18px] bg-[#26262b]">{expanded ? null : view}</div>
+    <button type="button" onClick={() => setExpanded(true)} className="mt-5 flex h-10 w-full items-center justify-center gap-2 rounded-full bg-white/15 text-caption font-semibold"><Asset src="/figma-nav.svg" className="h-4 w-4" />Маршрут и карта</button>
+    {expanded && frame ? createPortal(view, frame) : null}
   </div>;
 }
 
@@ -830,12 +1032,27 @@ function MemberRow({ member, role, revealed, onReveal, onClose }: { member: Memb
     else onClose();
     if (shouldOpen === revealed) void animate(x, shouldOpen ? -action : 0, swipeSpring);
   };
-  return <div className="relative h-[104px] overflow-hidden rounded-[24px]">
+  const now = member.currentTask.split("· ").at(-1) ?? member.currentTask;
+  return <div className="relative overflow-hidden rounded-[24px]">
     <div className="absolute inset-y-0 right-3 z-0 flex items-center">
       <motion.button type="button" aria-label={`Изменить расписание ${member.name}`} style={{ scale, opacity }} whileTap={{ scale: 0.9 }} onClick={() => openSchedule(member.id, "live")} className="grid h-11 w-11 place-items-center rounded-full bg-[#007AFF] text-white shadow-[0_8px_18px_rgba(0,122,255,0.4)]"><Pencil size={20} strokeWidth={2.2} /></motion.button>
     </div>
-    <motion.button type="button" drag="x" dragConstraints={{ left: -action, right: 0 }} dragElastic={0.16} dragMomentum={false} dragDirectionLock style={{ x }} onDragEnd={(_, info) => finish(info)} onClick={() => { if (moved.current) { moved.current = false; return; } if (revealed) onClose(); else open("member", member.id); }} className="absolute inset-0 z-10 flex items-start gap-3 rounded-[24px] bg-[#1a1a1a] p-4 text-left">
-      <Avatar member={member} /><div className="min-w-0 flex-1"><div className="flex items-start justify-between"><div><b className="block text-callout">{member.name}</b><small className="text-caption text-white/45">{role}</small></div><StatusPill status={member.status} /></div><div className="mt-1 flex justify-between text-caption"><span>{member.spot}</span><b className="text-[#ff6b00]">{member.currentTask.split("· ").at(-1)}</b></div><p className="truncate text-caption text-white/40">дальше {member.next}</p></div>
+    <motion.button type="button" drag="x" dragConstraints={{ left: -action, right: 0 }} dragElastic={0.16} dragMomentum={false} dragDirectionLock style={{ x }} onDragEnd={(_, info) => finish(info)} onClick={() => { if (moved.current) { moved.current = false; return; } if (revealed) onClose(); else open("member", member.id); }} className="relative z-10 flex w-full items-center gap-4 rounded-[24px] bg-[#1a1a1a] p-5 text-left">
+      <Avatar member={member} />
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <b className="block truncate text-callout">{member.name}</b>
+            <small className="mt-0.5 block truncate text-caption text-white/45">{role}</small>
+          </div>
+          <span className="shrink-0"><StatusPill status={member.status} /></span>
+        </div>
+        <div className="flex items-center justify-between gap-3 text-caption">
+          <span className="min-w-0 truncate">{member.spot}</span>
+          <b className="shrink-0 font-semibold text-[#ff6b00]">{now}</b>
+        </div>
+        <p className="truncate text-caption text-white/40">дальше {member.next}</p>
+      </div>
     </motion.button>
   </div>;
 }
@@ -1075,7 +1292,7 @@ function InviteSheet() {
   };
   return <div data-node-id="2:511">
     <SheetHeader title="Команда" />
-    <div className="mt-2 flex h-[150px] items-center gap-4 rounded-[20px] bg-[#2c2c2e] p-4"><span className="grid h-24 w-24 place-items-center rounded-2xl bg-white"><Asset src="/figma-qr-large.svg" className="h-[76px] w-[76px]" /></span><div><b className="text-body">Пригласите команду</b><p className="text-callout text-[#ff6b00]">embers.app/j/{record.code}</p><p className="text-caption text-white/50">Код: {record.code}</p><button onClick={() => { void shareInvite(event.title || "Событие", record.code).then(shareResult); }} className="mt-3 flex h-9 items-center gap-2 rounded-full bg-[#ff6b00] px-3.5 text-callout font-semibold"><Share2 size={16} />Поделиться</button></div></div>
+    <div className="mt-2 flex h-[150px] items-center gap-4 rounded-[20px] bg-[#2c2c2e] p-4"><span className="grid h-24 w-24 place-items-center rounded-2xl bg-white"><Asset src="/figma-qr-large.svg" className="h-[76px] w-[76px]" /></span><div><b className="text-body">Пригласите команду</b><p className="text-callout text-[#ff6b00]">amber.app/j/{record.code}</p><p className="text-caption text-white/50">Код: {record.code}</p><button onClick={() => { void shareInvite(event.title || "Событие", record.code).then(shareResult); }} className="mt-3 flex h-9 items-center gap-2 rounded-full bg-[#ff6b00] px-3.5 text-callout font-semibold"><Share2 size={16} />Поделиться</button></div></div>
     <p className="ml-5 mt-5 text-caption text-white/50">УЧАСТНИКИ · {team.length + 1 + openRoles.length}</p>
     <div className="mt-2 overflow-hidden rounded-[20px] bg-[#2c2c2e]">
       <button onClick={() => openSchedule("vadim")} className="flex h-[60px] w-full items-center gap-3 px-4 text-left"><span className="grid h-10 w-10 place-items-center rounded-full bg-[#ff6b00]">ВФ</span><div className="flex-1"><p>Вадим Филатов <Crown size={13} className="inline text-[#ff6b00]" /></p><small className="text-white/50">{roles.vadim}</small></div><ChevronRight size={18} className="text-white/40" /></button>
@@ -1610,11 +1827,11 @@ function AccountSheet() {
   const archiveCount = events.filter((event) => event.archivedAt != null || eventPhase(event.details, now.getTime()) === "past").length;
   const [page, setPage] = useState<"root" | "notifications" | "calendar" | "email" | "privacy" | "help" | "terms" | "locations" | "archive">("root");
   const pages = {
-    notifications: { title: "Уведомления", key: "notifications" as const, text: "Сообщения команды, смена статуса и напоминания о ваших сменах." },
     calendar: { title: "Календарь", key: "calendar" as const, text: "Событие появится в календаре телефона, когда синхронизация будет подключена." },
     email: { title: "Письма", key: "emailUpdates" as const, text: "Письма о приглашениях и изменениях в расписании." },
   };
-  if (page === "notifications" || page === "calendar" || page === "email") {
+  if (page === "notifications") return <NotificationsPage onBack={() => setPage("root")} />;
+  if (page === "calendar" || page === "email") {
     const current = pages[page];
     return <div>
       <div className="relative flex h-11 items-center"><button type="button" onClick={() => setPage("root")} className="flex items-center text-body text-[#0A84FF]"><ChevronLeft size={22} />Настройки</button><h2 className="absolute inset-x-24 text-center text-body font-semibold">{current.title}</h2></div>
@@ -1626,9 +1843,9 @@ function AccountSheet() {
   if (page === "archive") return <ArchivePage onBack={() => setPage("root")} />;
   if (page === "privacy" || page === "help" || page === "terms") {
     const copy = {
-      privacy: ["Конфиденциальность", "Embers хранит событие, команду и расписание на этом устройстве. В демо-версии данные никуда не отправляются."],
+      privacy: ["Конфиденциальность", "Amber хранит событие, команду и расписание на этом устройстве. В демо-версии данные никуда не отправляются."],
       help: ["Помощь", "Сдвиньте карточку человека влево, чтобы открыть его расписание. В программе события можно приложить PDF: проходки, инструкции и другие файлы."],
-      terms: ["Условия", "Продолжая пользоваться Embers, вы соглашаетесь с правилами сервиса. Это демонстрационная версия."],
+      terms: ["Условия", "Продолжая пользоваться Amber, вы соглашаетесь с правилами сервиса. Это демонстрационная версия."],
     }[page];
     return <div>
       <div className="relative flex h-11 items-center"><button type="button" onClick={() => setPage("root")} className="flex items-center text-body text-[#0A84FF]"><ChevronLeft size={22} />Настройки</button><h2 className="absolute inset-x-24 text-center text-body font-semibold">{copy[0]}</h2></div>
@@ -1660,6 +1877,96 @@ function AccountSheet() {
       <button type="button" onClick={() => setScreen("auth")} className="flex h-[52px] w-full items-center border-t border-white/10 px-4 text-left text-body text-[#ff453a]">Выйти</button>
     </div>
   </div>;
+}
+
+function NotificationsPage({ onBack }: { onBack: () => void }) {
+  const prefs = useEmbersStore((s) => s.accountPrefs);
+  const setPref = useEmbersStore((s) => s.setAccountPref);
+  const setNotice = useEmbersStore((s) => s.setNotice);
+  const [permission, setPermission] = useState(notificationPermission);
+  const enable = async () => {
+    if (prefs.notifications) {
+      setPref("notifications", false);
+      return;
+    }
+    const result = await requestNotificationPermission();
+    setPermission(result);
+    if (result !== "granted") {
+      setPref("notifications", false);
+      setNotice(result === "unsupported" ? "Уведомления недоступны в этом браузере" : "Разрешите уведомления в настройках браузера");
+      return;
+    }
+    setPref("notifications", true);
+    await showNotification("Amber", "Уведомления включены. Пришлём смену статуса, новости команды и напоминание о смене.");
+  };
+  const kinds = [
+    ["notifyStatus", "Смена статуса", "Когда вы отмечаетесь: на площадке, в пути, готов или сбор."] as const,
+    ["notifyTeam", "Команда", "Когда в событие добавляют человека."] as const,
+    ["notifyShifts", "Напоминания о смене", "За 20 минут до начала события и вашей локации."] as const,
+  ];
+  return <div>
+    <div className="relative flex h-11 items-center"><button type="button" onClick={onBack} className="flex items-center text-body text-[#0A84FF]"><ChevronLeft size={22} />Настройки</button><h2 className="absolute inset-x-24 text-center text-body font-semibold">Уведомления</h2></div>
+    <div className="mt-4 flex h-[52px] items-center rounded-[22px] bg-[#2c2c2e] px-4 text-body">Уведомления<span className="ml-auto"><SettingsSwitch on={prefs.notifications && permission === "granted"} onToggle={() => { void enable(); }} /></span></div>
+    <p className="mt-2 px-4 text-caption leading-5 text-white/45">{permission === "denied" ? "Браузер запретил уведомления. Разрешите их для Amber в настройках сайта, затем включите переключатель снова." : prefs.notifications && permission === "granted" ? "Amber пришлёт смену статуса, новости команды и напоминание за 20 минут до смены." : "Включение запросит разрешение. Пока оно выключено, Amber ничего не присылает."}</p>
+    {prefs.notifications && permission === "granted" && <div className="mt-4 overflow-hidden rounded-[22px] bg-[#2c2c2e]">{kinds.map(([key, title, text], index) => <div key={key} className={cn("px-4 py-3", index > 0 && "border-t border-white/10")}><div className="flex items-center"><span className="text-body">{title}</span><span className="ml-auto"><SettingsSwitch on={prefs[key]} onToggle={() => setPref(key, !prefs[key])} /></span></div><p className="mt-1 pr-16 text-caption leading-5 text-white/45">{text}</p></div>)}</div>}
+  </div>;
+}
+
+function shiftStart(time: string) {
+  const match = /(\d{2}):(\d{2})/.exec(time);
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function NotificationBridge() {
+  const enabled = useEmbersStore((s) => s.accountPrefs.notifications);
+  const notifyStatus = useEmbersStore((s) => s.accountPrefs.notifyStatus);
+  const notifyTeam = useEmbersStore((s) => s.accountPrefs.notifyTeam);
+  const notifyShifts = useEmbersStore((s) => s.accountPrefs.notifyShifts);
+  const activeId = useEmbersStore((s) => s.activeEventId);
+  const status = useEmbersStore((s) => s.events.find((event) => event.id === s.activeEventId)?.myStatus);
+  const teamKey = useEmbersStore((s) => s.events.find((event) => event.id === s.activeEventId)?.team.map((member) => `${member.id}:${member.name}:${member.role}`).join("\0") ?? "");
+  const seenStatus = useRef<Record<string, Status>>({});
+  const seenTeam = useRef<Record<string, string>>({});
+  const sentShifts = useRef(new Set<string>());
+  useEffect(() => {
+    const previous = seenStatus.current[activeId];
+    if (status) seenStatus.current[activeId] = status;
+    if (!enabled || !notifyStatus || !previous || !status || previous === status) return;
+    void showNotification("Статус", `Вы отметились: ${statusMeta[status].label}`);
+  }, [activeId, enabled, notifyStatus, status]);
+  useEffect(() => {
+    const previous = seenTeam.current[activeId];
+    seenTeam.current[activeId] = teamKey;
+    if (!enabled || !notifyTeam || previous == null) return;
+    const before = new Set(previous ? previous.split("\0").map((item) => item.split(":")[0]) : []);
+    const added = teamKey.split("\0").map((item) => item.split(":")).find(([id]) => id && !before.has(id));
+    if (added) void showNotification("Команда", `${added[1]} теперь в команде · ${added[2] || "Участник"}`);
+  }, [activeId, enabled, notifyTeam, teamKey]);
+  useEffect(() => {
+    if (!enabled || !notifyShifts) return;
+    const tick = () => {
+      const state = useEmbersStore.getState();
+      if (!state.accountPrefs.notifications || !state.accountPrefs.notifyShifts) return;
+      if (notificationPermission() !== "granted") return;
+      const event = state.events.find((item) => item.id === state.activeEventId);
+      if (!event) return;
+      const now = new Date();
+      const minutes = now.getHours() * 60 + now.getMinutes();
+      const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      const due = (key: string, start: number | null, title: string, body: string) => {
+        if (start == null || start - minutes > 20 || start < minutes || sentShifts.current.has(key)) return;
+        sentShifts.current.add(key);
+        void showNotification(title, body);
+      };
+      if (event.details.date === day) due(`${event.id}:event`, shiftStart(event.details.time), "Смена", `${event.details.title} начинается в ${event.details.time}`);
+      for (const block of event.schedules.vadim ?? []) due(`${event.id}:${block.id}`, shiftStart(block.time), "Смена", `${block.location} · ${block.time.split("–")[0]?.trim() ?? block.time}`);
+    };
+    tick();
+    const timer = setInterval(tick, 30000);
+    return () => clearInterval(timer);
+  }, [enabled, notifyShifts]);
+  return null;
 }
 
 function PhoneSheet() {
@@ -1705,6 +2012,7 @@ export default function EmbersApp() {
   const views = {auth:<AuthScreen/>,hub:<EventsHub/>,create:<CreateEvent/>,live:<LiveBoard/>,schedule:<ScheduleScreen/>};
   return <main className="grid h-dvh place-items-center overflow-hidden bg-black">
     <ArchiveSweep />
+    <NotificationBridge />
     <div data-vaul-drawer-wrapper="" className="phone-frame relative w-full overflow-hidden bg-black text-white">
       <div key={screen} className={cn("no-scrollbar h-full", screen === "create" || screen === "schedule" || screen === "auth" ? "overflow-hidden" : "overflow-y-auto")}><div className={cn("relative", screen === "create" || screen === "schedule" || screen === "auth" ? "h-full" : "min-h-full")}>{views[screen]}</div></div>
     </div><Sheets /><FrameNotice />

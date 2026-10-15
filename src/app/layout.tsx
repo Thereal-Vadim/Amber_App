@@ -3,10 +3,10 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Embers — команда в одном ритме",
+  title: "Amber — команда в одном ритме",
   description: "Координация event-команды в реальном времени",
-  applicationName: "Embers",
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Embers" },
+  applicationName: "Amber",
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Amber" },
   formatDetection: { telephone: false },
 };
 

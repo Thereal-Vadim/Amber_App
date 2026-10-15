@@ -147,7 +147,7 @@ type Store = {
   draftEvent: EventRecord | null;
   scheduleOrigin: "live" | "invite";
   scheduleReturn: "live" | "create";
-  accountPrefs: { notifications: boolean; calendar: boolean; emailUpdates: boolean };
+  accountPrefs: { notifications: boolean; notifyStatus: boolean; notifyShifts: boolean; notifyTeam: boolean; calendar: boolean; emailUpdates: boolean };
   setScreen: (screen: Screen) => void;
   openSheet: (sheet: Sheet, memberId?: string) => void;
   closeSheet: () => void;
@@ -184,7 +184,7 @@ type Store = {
   addPresetLocation: (group: string, name: string) => void;
   updatePresetLocation: (id: string, patch: { group?: string; color?: string; icon?: LocationIcon }) => void;
   removePresetLocation: (group: string, id: string) => void;
-  setAccountPref: (key: "notifications" | "calendar" | "emailUpdates", value: boolean) => void;
+  setAccountPref: (key: "notifications" | "notifyStatus" | "notifyShifts" | "notifyTeam" | "calendar" | "emailUpdates", value: boolean) => void;
 };
 
 const joinCodeSchema = z.string().regex(/^[A-Z0-9]{6}$/, "Введите 6 символов");
@@ -360,7 +360,7 @@ export const useEmbersStore = create<Store>((set) => ({
   draftEvent: null,
   scheduleOrigin: "invite",
   scheduleReturn: "create",
-  accountPrefs: { notifications: true, calendar: false, emailUpdates: false },
+  accountPrefs: { notifications: false, notifyStatus: true, notifyShifts: true, notifyTeam: true, calendar: false, emailUpdates: false },
   setScreen: (screen) => set((state) => ({
     screen,
     sheet: null,

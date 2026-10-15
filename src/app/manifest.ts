@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Embers — команда в одном ритме",
-    short_name: "Embers",
+    name: "Amber — команда в одном ритме",
+    short_name: "Amber",
     description: "Координация event-команды в реальном времени",
     start_url: "/",
     display: "standalone",
