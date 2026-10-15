@@ -153,6 +153,7 @@ type Store = {
   closeSheet: () => void;
   selectEvent: (id: string) => void;
   archiveEvent: (id: string) => void;
+  restoreEvent: (id: string) => void;
   deleteEvent: (id: string) => void;
   pruneArchive: (now: number) => void;
   updateMyStatus: (status: Status) => void;
@@ -377,6 +378,18 @@ export const useEmbersStore = create<Store>((set) => ({
       events: state.events.map((event) => event.id === id ? { ...event, archivedAt: now } : event),
       ...(next ? { activeEventId: next } : {}),
       notice: "Событие в архиве",
+    };
+  }),
+  restoreEvent: (id) => set((state) => {
+    const now = Date.now();
+    const current = state.events.find((event) => event.id === id);
+    if (!current || current.archivedAt == null || eventPhase(current.details, now) === "past") return state;
+    return {
+      events: state.events.map((event) => event.id === id ? { ...event, archivedAt: null } : event),
+      activeEventId: id,
+      screen: "hub",
+      sheet: null,
+      notice: "Событие снова на доске",
     };
   }),
   deleteEvent: (id) => set((state) => {

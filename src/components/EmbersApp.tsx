@@ -99,7 +99,7 @@ function FrameNotice() {
     return () => clearTimeout(timer);
   }, [notice, setNotice]);
   if (!notice) return null;
-  return <p className="fixed bottom-8 left-1/2 z-[200] -translate-x-1/2 rounded-full bg-white px-4 py-2 text-[13px] font-semibold text-black">{notice}</p>;
+  return <p className="fixed bottom-[max(32px,calc(env(safe-area-inset-bottom)+16px))] left-1/2 z-[200] -translate-x-1/2 rounded-full bg-white px-4 py-2 text-[13px] font-semibold text-black">{notice}</p>;
 }
 
 function Press({ children, className, onClick, type = "button" }: {
@@ -128,18 +128,20 @@ function CircleButton({ children, onClick, light = false, label, className }: { 
 function AuthScreen() {
   const setScreen = useEmbersStore((s) => s.setScreen);
   const open = useEmbersStore((s) => s.openSheet);
-  return <div className="figma-gradient relative h-full min-h-[852px] overflow-hidden text-center" data-node-id="2:3">
-    <div className="absolute left-1/2 top-[162px] grid h-24 w-24 -translate-x-1/2 place-items-center rounded-[28px] border border-white/35 bg-white/15">
-      <Asset src="/figma-flame.svg" className="h-12 w-12" />
+  return <div className="figma-gradient flex h-full min-h-0 flex-col overflow-hidden px-5 pt-[max(16px,env(safe-area-inset-top))] text-center" data-node-id="2:3">
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-4">
+      <div className="grid h-24 w-24 shrink-0 place-items-center rounded-[28px] border border-white/35 bg-white/15">
+        <Asset src="/figma-flame.svg" className="h-12 w-12" />
+      </div>
+      <h1 className="mt-7 text-5xl font-extrabold tracking-[-.02em]">Embers</h1>
+      <h2 className="mt-4 text-xl font-semibold">Вся команда на одной карте</h2>
+      <p className="mt-3 text-[15px] leading-5 text-[#ebebf599]">Кто где, что делает и сколько осталось —<br />в реальном времени на любом событии</p>
     </div>
-    <h1 className="absolute inset-x-0 top-[283px] text-5xl font-extrabold tracking-[-.02em]">Embers</h1>
-    <h2 className="absolute inset-x-0 top-[351px] text-xl font-semibold">Вся команда на одной карте</h2>
-    <p className="absolute left-9 right-9 top-[386px] text-[15px] leading-5 text-[#ebebf599]">Кто где, что делает и сколько осталось —<br />в реальном времени на любом событии</p>
-    <div className="absolute inset-x-5 top-[596px] space-y-3">
+    <div className="shrink-0 space-y-3 pb-[max(24px,env(safe-area-inset-bottom))]">
       <Press onClick={() => setScreen("hub")} className="flex h-[54px] w-full items-center justify-center gap-2 rounded-full bg-white text-[17px] font-semibold text-black"><Asset src="/figma-apple.svg" />Войти через Apple</Press>
       <Press onClick={() => open("phone")} className="flex h-[54px] w-full items-center justify-center gap-2 rounded-full border border-white/30 bg-white/15 text-[17px] font-semibold"><Asset src="/figma-phone.svg" />Войти по номеру</Press>
+      <p className="px-4 pt-2 text-xs leading-4 text-[#ebebf599]">Продолжая, вы принимаете Условия использования<br />и Политику конфиденциальности</p>
     </div>
-    <p className="absolute inset-x-9 top-[732px] text-xs leading-4 text-[#ebebf599]">Продолжая, вы принимаете Условия использования<br />и Политику конфиденциальности</p>
   </div>;
 }
 
@@ -165,7 +167,7 @@ function HubHeader() {
   const events = useBoardEvents();
   const selectEvent = useEmbersStore((s) => s.selectEvent);
   const [menu, setMenu] = useState(false);
-  return <div className="absolute inset-x-5 top-10 z-20 flex h-11 items-center">
+  return <div className="absolute inset-x-5 top-(--chrome-top) z-20 flex h-11 items-center">
     <button onClick={() => setMenu((value) => !value)} className="flex items-center text-left" aria-expanded={menu}>
       <h1 className="text-[34px] font-bold tracking-tight">События</h1>
       <ChevronDown size={22} className={cn("ml-1 text-white/60 transition-transform", menu && "rotate-180")} />
@@ -184,14 +186,14 @@ function EmptyHub({ archived }: { archived: boolean }) {
   const open = useEmbersStore((s) => s.openSheet);
   const startCreate = useEmbersStore((s) => s.startCreate);
   return <div data-node-id="2:57">
-    <div className="absolute left-14 right-14 top-[106px] h-10 rounded-[28px] bg-white/5" />
-    <div className="absolute left-[38px] right-[38px] top-[120px] h-10 rounded-[30px] bg-white/[.07]" />
-    <div className="absolute inset-x-5 top-[136px] flex h-[330px] flex-col items-center rounded-[32px] border border-white/[.08] bg-white/10 text-center">
+    <div className="absolute left-14 right-14 top-[calc(106px+var(--chrome-shift))] h-10 rounded-[28px] bg-white/5" />
+    <div className="absolute left-[38px] right-[38px] top-[calc(120px+var(--chrome-shift))] h-10 rounded-[30px] bg-white/[.07]" />
+    <div className="absolute inset-x-5 top-[calc(136px+var(--chrome-shift))] flex h-[330px] flex-col items-center rounded-[32px] border border-white/[.08] bg-white/10 text-center">
       <span className="mt-[34px] grid h-[104px] w-[104px] place-items-center rounded-full bg-orange-500/25"><CalendarDays size={48} className="text-[#ff6b00]" /></span>
       <h2 className="mt-6 text-[26px] font-bold">{archived ? "События в архиве" : "Пока нет событий"}</h2>
       <p className="mt-2 px-5 text-[15px] leading-5 text-[#ebebf599]">{archived ? <>Прошедшие события лежат в настройках<br />и хранятся там 7 дней</> : <>Создайте событие и пригласите команду<br />или присоединитесь по ссылке<br />от организатора</>}</p>
     </div>
-    <div className="absolute inset-x-5 top-[516px] space-y-3">
+    <div className="absolute inset-x-5 top-[calc(516px+var(--chrome-shift))] space-y-3">
       <Press onClick={startCreate} className="flex h-[54px] w-full items-center justify-center gap-2 rounded-full bg-[#ff6b00] text-[17px] font-semibold"><Plus size={18} />Создать событие</Press>
       <Press onClick={() => open("join")} className="flex h-[54px] w-full items-center justify-center gap-2 rounded-full border border-white/15 bg-white/15 text-[16px] font-semibold"><Link2 size={18} />Присоединиться по ссылке или коду</Press>
     </div>
@@ -404,7 +406,7 @@ function EventPager() {
     window.addEventListener("pointerup", up);
   };
 
-  return <div ref={frameRef} onPointerDown={onPointerDown} className="absolute inset-x-5 top-[104px] bottom-[52px] touch-none overflow-hidden">
+  return <div ref={frameRef} onPointerDown={onPointerDown} className="absolute inset-x-5 top-[calc(104px+var(--chrome-shift))] bottom-[max(52px,env(safe-area-inset-bottom))] touch-none overflow-hidden">
     {width > 0 && <motion.div className="flex h-full" style={{ x, gap: cardGap }}>
       {events.map((item) => <div key={item.id} className="relative h-full shrink-0" style={{ width }} inert={item.id !== activeId}>
         {item.id === activeId && <>
@@ -444,7 +446,7 @@ function EventsHub() {
   }, [activeId, boardKey, selectEvent]);
   return <div className="hub-gradient absolute inset-0 overflow-hidden" data-node-id={board.length ? "2:131" : "2:57"}>
     <HubHeader />{board.length ? <EventPager /> : <EmptyHub archived={events.length > 0} />}
-    {board.length > 1 && <div className="absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 gap-2">
+    {board.length > 1 && <div className="absolute bottom-[max(24px,env(safe-area-inset-bottom))] left-1/2 z-10 flex -translate-x-1/2 gap-2">
       {board.map((item) => <button key={item.id} aria-label={item.details.title} onClick={() => selectEvent(item.id)} className={cn("h-2 w-2 rounded-full", item.id === activeId ? "bg-white" : "bg-white/30")} />)}
     </div>}
   </div>;
@@ -522,7 +524,7 @@ function LocationMap({ lat, lng }: { lat: number; lng: number }) {
   const view = <div className={expanded ? "absolute inset-0 z-40 bg-[#111]" : "relative h-full w-full"}>
     <div ref={nodeRef} className="h-full w-full" />
     {expanded
-      ? <button type="button" aria-label="Закрыть карту" onClick={() => setExpanded(false)} className="absolute left-5 top-10 z-20 grid h-11 w-11 place-items-center rounded-full bg-black/55 text-white backdrop-blur-xl"><X size={20} /></button>
+      ? <button type="button" aria-label="Закрыть карту" onClick={() => setExpanded(false)} className="absolute left-5 top-(--chrome-top) z-20 grid h-11 w-11 place-items-center rounded-full bg-black/55 text-white backdrop-blur-xl"><X size={20} /></button>
       : <button type="button" aria-label="Открыть карту" onClick={() => setExpanded(true)} className="absolute inset-0 z-10" />}
   </div>;
   return <>
@@ -547,8 +549,8 @@ function CreateEvent() {
   useEffect(() => { if (draft.venue) setShowMap(true); }, [draft.venue]);
   return <div className="relative h-full">
     <div className="no-scrollbar h-full overflow-y-auto">
-    <div className="figma-gradient relative min-h-full pb-8" data-node-id="2:347">
-    <div className="flex h-[28rem] flex-col items-center px-5 pt-[84px]">
+    <div className="figma-gradient relative min-h-full pb-[max(32px,env(safe-area-inset-bottom))]" data-node-id="2:347">
+    <div className="flex h-[28rem] flex-col items-center px-5 pt-[calc(84px+var(--chrome-shift))]">
       <input ref={coverRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) updateDraft({ cover: URL.createObjectURL(file) }); }} />
       <div className="flex flex-1 items-center">
         <button aria-label="Добавить фотографию" onClick={() => coverRef.current?.click()} className="relative grid h-[72px] w-[72px] place-items-center overflow-hidden rounded-full bg-white/20">{draft.cover ? <span className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${draft.cover})` }} /> : <ImagePlus size={30} />}</button>
@@ -581,8 +583,8 @@ function CreateEvent() {
     </div>
     </div>
     </div>
-    <div className="absolute left-5 top-10 z-30"><CircleButton onClick={() => setScreen("hub")} label="Назад" className="backdrop-blur-xl"><X size={20} /></CircleButton></div>
-    <button onClick={createEvent} className="absolute right-5 top-10 z-30 h-11 rounded-full bg-white/20 px-4 text-[15px] font-semibold backdrop-blur-xl">Создать</button>
+    <div className="absolute left-5 top-(--chrome-top) z-30"><CircleButton onClick={() => setScreen("hub")} label="Назад" className="backdrop-blur-xl"><X size={20} /></CircleButton></div>
+    <button onClick={createEvent} className="absolute right-5 top-(--chrome-top) z-30 h-11 rounded-full bg-white/20 px-4 text-[15px] font-semibold backdrop-blur-xl">Создать</button>
   </div>;
 }
 
@@ -863,11 +865,11 @@ function LiveBoard() {
   const now = useClock();
   const myStatus = record.myStatus;
   const event = record.details;
-  return <div className="relative min-h-[1520px] bg-black pb-8" data-node-id="2:598">
+  return <div className="relative min-h-[1520px] bg-black pb-[max(32px,env(safe-area-inset-bottom))]" data-node-id="2:598">
     <div className="figma-gradient pointer-events-none absolute inset-x-0 top-0 h-[416px]" />
-    <div className="absolute left-5 top-10 z-30"><CircleButton onClick={() => setScreen("hub")} label="Назад"><Asset src="/figma-back.svg" /></CircleButton></div>
-    <div className="absolute right-5 top-10 z-30 flex gap-2"><CircleButton label="Поделиться" onClick={() => { void shareInvite(event.title, record.code).then(shareResult); }}><Asset src="/figma-share.svg" /></CircleButton><button onClick={() => open("account")} aria-label="Аккаунт" className="grid h-11 w-11 place-items-center rounded-full bg-[#9c613d] text-sm font-semibold">ВФ</button></div>
-    <div className="relative z-0 px-5 pt-[104px]">
+    <div className="absolute left-5 top-(--chrome-top) z-30"><CircleButton onClick={() => setScreen("hub")} label="Назад"><Asset src="/figma-back.svg" /></CircleButton></div>
+    <div className="absolute right-5 top-(--chrome-top) z-30 flex gap-2"><CircleButton label="Поделиться" onClick={() => { void shareInvite(event.title, record.code).then(shareResult); }}><Asset src="/figma-share.svg" /></CircleButton><button onClick={() => open("account")} aria-label="Аккаунт" className="grid h-11 w-11 place-items-center rounded-full bg-[#9c613d] text-sm font-semibold">ВФ</button></div>
+    <div className="relative z-0 px-5 pt-[calc(104px+var(--chrome-shift))]">
       <div className="text-center"><EventStatusBadge phase={eventPhase(event, now.getTime())} size="board" /><h1 className="mt-2 text-[28px] font-extrabold tracking-tight">{event.title}</h1><p className="text-[11px] text-white/85">{event.dateLabel} · {event.venue}</p></div>
       <div className="mt-4"><Timeline /></div>
       <div className="mt-3 flex h-[52px] items-center rounded-[22px] bg-white/10 px-3"><span className="grid h-9 w-9 place-items-center rounded-full" style={{ background: `${statusMeta[myStatus].color}33` }}><MapPin size={18} style={{ color: statusMeta[myStatus].color }} /></span><div className="ml-3 flex-1"><p className="text-[10px] text-white/45">Мой статус</p><p className="text-[13px] font-semibold">{statusMeta[myStatus].label}</p></div><button onClick={() => open("status")} className="h-9 rounded-full bg-[#ff6b00] px-4 text-xs font-semibold">Сменить</button></div>
@@ -1342,15 +1344,15 @@ function ScheduleScreen() {
     window.addEventListener("pointerup", up);
   };
   return <div ref={screenRef} className="relative h-full overflow-hidden bg-black" data-node-id={configured ? "4:88" : "4:2"}>
-    <button type="button" aria-label="Назад" onClick={backToTeam} className="absolute left-5 top-10 z-30 grid h-11 w-11 place-items-center rounded-full border border-white/10 bg-[#28282ae6]"><Asset src="/figma-schedule-back.svg" className="h-6 w-6" /></button>
-    <div className="pointer-events-none absolute inset-x-[72px] top-10 z-30 flex h-11 items-center justify-center"><b className="truncate text-[16px]">Расписание {person.name}</b></div>
-    <div className="absolute left-1/2 top-[96px] z-30 w-max max-w-[calc(100%-40px)] -translate-x-1/2"><RoleChip key={memberId} role={role} onSave={(next) => setRole(memberId, next)} /></div>
-    <motion.div ref={listRef} style={{ paddingBottom: listPad }} className="no-scrollbar absolute inset-x-5 top-[148px] bottom-0 overflow-y-auto overscroll-contain">
+    <button type="button" aria-label="Назад" onClick={backToTeam} className="absolute left-5 top-(--chrome-top) z-30 grid h-11 w-11 place-items-center rounded-full border border-white/10 bg-[#28282ae6]"><Asset src="/figma-schedule-back.svg" className="h-6 w-6" /></button>
+    <div className="pointer-events-none absolute inset-x-[72px] top-(--chrome-top) z-30 flex h-11 items-center justify-center"><b className="truncate text-[16px]">Расписание {person.name}</b></div>
+    <div className="absolute left-1/2 top-[calc(96px+var(--chrome-shift))] z-30 w-max max-w-[calc(100%-40px)] -translate-x-1/2"><RoleChip key={memberId} role={role} onSave={(next) => setRole(memberId, next)} /></div>
+    <motion.div ref={listRef} style={{ paddingBottom: listPad }} className="no-scrollbar absolute inset-x-5 top-[calc(148px+var(--chrome-shift))] bottom-0 overflow-y-auto overscroll-contain">
       {!configured && <p className={cn("px-1 text-center text-[15px] leading-5", dragChip ? "text-[#ff6b00]" : "text-[#8e8e93]")}>{dragChip ? "Отпустите, чтобы добавить локацию" : <>Чтобы составить расписание {possessive}, добавьте<br />локации из области внизу. Их можно перетаскивать.</>}</p>}
       {configured && <Reorder.Group as="div" axis="y" values={blocks} onReorder={reorder} className="relative pb-2">{blocks.map((b, i) => <ScheduleRow key={b.id} block={b} index={i} marked={Boolean(dragChip) && dropIndex === i} onRemove={() => remove(b.id)} onChange={(patch) => update(b.id, patch)} onTravel={(travel) => update(b.id, { travel })} />)}{dragChip && dropIndex === blocks.length && <div className="mt-2 h-0.5 rounded-full bg-[#ff6b00]" />}</Reorder.Group>}
     </motion.div>
     {wideScreen && typeof document !== "undefined" ? createPortal(<div aria-hidden style={{ bottom: blurBottom, height: collapsed / 2, WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, #000 100%)", maskImage: "linear-gradient(to bottom, transparent 0%, #000 100%)", WebkitBackdropFilter: "blur(24px)", backdropFilter: "blur(24px)" }} className="pointer-events-none fixed inset-x-0 z-10" />, document.body) : <div aria-hidden style={{ height: collapsed / 2, WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, #000 100%)", maskImage: "linear-gradient(to bottom, transparent 0%, #000 100%)", WebkitBackdropFilter: "blur(24px)", backdropFilter: "blur(24px)" }} className="pointer-events-none absolute inset-x-0 bottom-0 z-10" />}
-    <motion.div ref={sheetRef} style={{ height: sheetHeight }} className="absolute inset-x-[21px] bottom-5 z-20 flex flex-col overflow-hidden rounded-[34px] border border-white/10 bg-[#1e1e20] px-4 pb-4 shadow-[0_18px_48px_rgba(0,0,0,.55)]">
+    <motion.div ref={sheetRef} style={{ height: sheetHeight }} className="absolute inset-x-[21px] bottom-[max(20px,env(safe-area-inset-bottom))] z-20 flex flex-col overflow-hidden rounded-[34px] border border-white/10 bg-[#1e1e20] px-4 pb-4 shadow-[0_18px_48px_rgba(0,0,0,.55)]">
       <div role="button" aria-label={expanded ? "Свернуть список локаций" : "Раскрыть список локаций"} onPointerDown={dragHandle} className="flex h-7 shrink-0 cursor-grab touch-none items-center justify-center active:cursor-grabbing"><i className="h-[5px] w-[60px] rounded-full bg-[#6e6e73]" /></div>
       <div className="flex shrink-0 gap-2"><div className="flex h-11 flex-1 items-center gap-2 rounded-full bg-[#3a3a3e] px-3 text-[#8e8e93]"><MapPin size={20} /><input value={locationName} onChange={(e) => setLocationName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addLocation()} placeholder="Новая локация" className="w-full bg-transparent text-[17px] text-white outline-none placeholder:text-[#8e8e93]" /></div><button onClick={() => addLocation()} className="grid h-11 w-11 place-items-center rounded-full bg-[#ff6b00]"><Plus size={24} /></button></div>
       <div className="no-scrollbar mt-3 flex shrink-0 gap-2 overflow-x-auto">{groups.map((group) => <button key={group.name} onClick={() => setCategory((item) => item === group.name ? "" : group.name)} className={cn("shrink-0 rounded-full px-4 py-2 text-[15px] font-medium", category === group.name ? "bg-[#ff6b00] text-white" : "bg-[#3a3a3e] text-[#ff6b00]")}>{group.name}</button>)}</div>
@@ -1572,19 +1574,26 @@ function ArchivePage({ onBack }: { onBack: () => void }) {
   const events = useEmbersStore((s) => s.events);
   const selectEvent = useEmbersStore((s) => s.selectEvent);
   const setScreen = useEmbersStore((s) => s.setScreen);
+  const restoreEvent = useEmbersStore((s) => s.restoreEvent);
   const now = useClock();
-  const archived = events.filter((event) => event.archivedAt != null || eventPhase(event.details, now.getTime()) === "past");
+  const time = now.getTime();
+  const archived = events.filter((event) => event.archivedAt != null || eventPhase(event.details, time) === "past");
   return <div>
     <div className="relative flex h-11 items-center"><button type="button" onClick={onBack} className="flex items-center text-[17px] text-[#0A84FF]"><ChevronLeft size={22} />Настройки</button><h2 className="absolute inset-x-24 text-center text-[17px] font-semibold">Архив</h2></div>
-    <p className="mt-3 px-1 text-[13px] leading-5 text-white/45">События в архиве хранятся 7 дней, затем архив очищается.</p>
+    <p className="mt-3 px-1 text-[13px] leading-5 text-white/45">События в архиве хранятся 7 дней, затем архив очищается. Текущие можно вернуть на доску.</p>
     {!archived.length && <p className="mt-8 text-center text-[15px] text-white/45">Архив пуст</p>}
     <div className="mt-4 space-y-2.5">{archived.map((event) => {
-      const days = archiveDaysLeft(event.details, now.getTime(), event.archivedAt);
+      const phase = eventPhase(event.details, time);
+      const days = archiveDaysLeft(event.details, time, event.archivedAt);
       const left = days <= 0 ? "Удалится сегодня" : `Ещё ${ruDays(days)}`;
-      return <button key={event.id} type="button" onClick={() => { selectEvent(event.id); setScreen("live"); }} className="flex w-full items-center gap-3 rounded-[22px] bg-[#2c2c2e] px-4 py-3 text-left">
-        <span className="min-w-0 flex-1"><b className="block truncate text-[17px] font-semibold">{event.details.title || "Без названия"}</b><small className="mt-0.5 block truncate text-[13px] text-white/45">{eventWhen(event.details)}</small><small className="mt-0.5 block text-[13px] text-white/45">{left}</small></span>
-        <EventStatusBadge phase="past" size="board" />
-      </button>;
+      const canRestore = event.archivedAt != null && phase !== "past";
+      return <div key={event.id} className="flex items-center gap-3 rounded-[22px] bg-[#2c2c2e] px-4 py-3">
+        <button type="button" onClick={() => { selectEvent(event.id); setScreen("live"); }} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+          <span className="min-w-0 flex-1"><b className="block truncate text-[17px] font-semibold">{event.details.title || "Без названия"}</b><small className="mt-0.5 block truncate text-[13px] text-white/45">{eventWhen(event.details)}</small><small className="mt-0.5 block text-[13px] text-white/45">{left}</small></span>
+          <EventStatusBadge phase={phase} size="board" />
+        </button>
+        {canRestore && <button type="button" onClick={() => restoreEvent(event.id)} style={{ fontSize: 13, fontWeight: 600 }} className="shrink-0 rounded-full bg-white px-3.5 py-2 text-black">Вернуть</button>}
+      </div>;
     })}</div>
   </div>;
 }
@@ -1670,7 +1679,7 @@ function Sheets() {
   const content: Partial<Record<Exclude<Sheet,null>,React.ReactNode>> = {join:<JoinSheet/>,datetime:<DateSheet/>,location:<LocationSheet/>,invite:<InviteSheet/>,member:<MemberSheet/>,status:<StatusSheet/>,account:<AccountSheet/>,phone:<PhoneSheet/>,files:<FilesSheet/>};
   const tall = ["join","location","invite","files","account"].includes(sheet ?? "");
   const heights: Record<string,string> = {datetime:"h-[560px]",status:"h-[552px]",member:"h-[702px]",account:"h-[420px]",phone:"h-[380px]"};
-  return <Drawer.Root open={sheet!==null} onOpenChange={(v)=>!v&&close()} shouldScaleBackground><Drawer.Portal><Drawer.Overlay className="fixed inset-0 z-[150] bg-black/50" /><Drawer.Content className={cn("fixed inset-x-0 bottom-0 z-[160] mx-auto max-w-[393px] overflow-y-auto rounded-t-[38px] bg-[#1c1c1e] px-4 pb-8 outline-none",tall?"h-[calc(100dvh-56px)] max-h-[836px]":heights[sheet??""]??"h-[70dvh]")}><Drawer.Title className="sr-only">{sheet}</Drawer.Title><i className="sticky top-1.5 z-20 mx-auto block h-[5px] w-[37px] rounded bg-[#7f7f7f80]" />{sheet === "account" ? <div className="pt-10">{content.account}</div> : sheet && content[sheet]}</Drawer.Content></Drawer.Portal></Drawer.Root>;
+  return <Drawer.Root open={sheet!==null} onOpenChange={(v)=>!v&&close()} shouldScaleBackground><Drawer.Portal><Drawer.Overlay className="fixed inset-0 z-[150] bg-black/50" /><Drawer.Content className={cn("fixed inset-x-0 bottom-0 z-[160] mx-auto w-full max-w-none overflow-y-auto rounded-t-[38px] bg-[#1c1c1e] px-4 pb-[max(32px,env(safe-area-inset-bottom))] outline-none min-[520px]:max-w-[393px]",tall?"h-[calc(100dvh-56px)] max-h-[836px]":heights[sheet??""]??"h-[70dvh]")}><Drawer.Title className="sr-only">{sheet}</Drawer.Title><i className="sticky top-1.5 z-20 mx-auto block h-[5px] w-[37px] rounded bg-[#7f7f7f80]" />{sheet === "account" ? <div className="pt-10">{content.account}</div> : sheet && content[sheet]}</Drawer.Content></Drawer.Portal></Drawer.Root>;
 }
 
 function ArchiveSweep() {
@@ -1680,13 +1689,23 @@ function ArchiveSweep() {
   return null;
 }
 
+function useStatusBar(screen: string) {
+  useEffect(() => {
+    const color = screen === "auth" || screen === "create" || screen === "live" ? "#ff6b00" : "#000000";
+    document.documentElement.style.backgroundColor = color;
+    document.body.style.backgroundColor = color;
+    document.querySelectorAll('meta[name="theme-color"]').forEach((node) => node.setAttribute("content", color));
+  }, [screen]);
+}
+
 export default function EmbersApp() {
   const screen = useEmbersStore((s) => s.screen);
+  useStatusBar(screen);
   const views = {auth:<AuthScreen/>,hub:<EventsHub/>,create:<CreateEvent/>,live:<LiveBoard/>,schedule:<ScheduleScreen/>};
-  return <main className="grid min-h-dvh place-items-center overflow-hidden bg-[#080402]">
+  return <main className="grid h-dvh place-items-center overflow-hidden bg-black">
     <ArchiveSweep />
     <div data-vaul-drawer-wrapper="" className="phone-frame relative w-full overflow-hidden bg-black text-white">
-      <div key={screen} className={cn("no-scrollbar h-full", screen === "create" || screen === "schedule" ? "overflow-hidden" : "overflow-y-auto")}><div className={cn("relative", screen === "create" || screen === "schedule" ? "h-full" : "min-h-full")}>{views[screen]}</div></div>
+      <div key={screen} className={cn("no-scrollbar h-full", screen === "create" || screen === "schedule" || screen === "auth" ? "overflow-hidden" : "overflow-y-auto")}><div className={cn("relative", screen === "create" || screen === "schedule" || screen === "auth" ? "h-full" : "min-h-full")}>{views[screen]}</div></div>
     </div><Sheets /><FrameNotice />
   </main>;
 }

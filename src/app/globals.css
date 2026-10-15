@@ -8,6 +8,8 @@
   --elevated: #2c2c2e;
   --secondary: #3a3a3e;
   --screen-gap: max(24px, env(safe-area-inset-top), env(safe-area-inset-bottom));
+  --chrome-top: max(40px, env(safe-area-inset-top, 0px));
+  --chrome-shift: max(0px, calc(env(safe-area-inset-top, 0px) - 40px));
 }
 
 @theme inline {
@@ -21,11 +23,19 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-html { background: #080402; }
+html {
+  background: #ff6b00;
+  height: -webkit-fill-available;
+  height: 100dvh;
+  overflow: hidden;
+}
 
 body {
   margin: 0;
-  background: var(--background);
+  height: -webkit-fill-available;
+  height: 100dvh;
+  overflow: hidden;
+  background: #ff6b00;
   color: var(--foreground);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Inter, sans-serif;
   overscroll-behavior: none;
@@ -81,14 +91,19 @@ input { color: inherit; }
 .pulse-ring { animation: pulse-ring 1.8s ease-out infinite; }
 
 .phone-frame {
+  position: fixed;
+  inset: 0;
   width: 100%;
-  height: 100dvh;
+  height: auto;
   min-height: 0;
-  max-height: 100dvh;
+  max-height: none;
+  border-radius: 0;
 }
 
 @media (min-width: 520px) {
   .phone-frame {
+    position: relative;
+    inset: auto;
     width: min(100%, 393px);
     height: min(852px, calc(100dvh - 48px));
     min-height: min(700px, calc(100dvh - 48px));
