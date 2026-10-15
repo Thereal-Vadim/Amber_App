@@ -99,7 +99,7 @@ function FrameNotice() {
     return () => clearTimeout(timer);
   }, [notice, setNotice]);
   if (!notice) return null;
-  return <p className="fixed bottom-[max(32px,calc(env(safe-area-inset-bottom)+16px))] left-1/2 z-[200] -translate-x-1/2 rounded-full bg-white px-4 py-2 text-[13px] font-semibold text-black">{notice}</p>;
+  return <p className="fixed bottom-[max(32px,calc(env(safe-area-inset-bottom)+16px))] left-1/2 z-[200] -translate-x-1/2 rounded-full bg-white px-4 py-2 text-caption font-semibold text-black">{notice}</p>;
 }
 
 function Press({ children, className, onClick, type = "button" }: {
@@ -113,12 +113,12 @@ function Asset({ src, className = "h-5 w-5" }: { src: string; className?: string
 }
 
 function Avatar({ member, size = 44 }: { member: Member; size?: number }) {
-  return <span style={{ width: size, height: size, background: member.color }} className="grid shrink-0 place-items-center rounded-full border-2 border-white text-sm font-semibold shadow-sm">{member.initials}</span>;
+  return <span style={{ width: size, height: size, background: member.color }} className="grid shrink-0 place-items-center rounded-full border-2 border-white text-callout font-semibold shadow-sm">{member.initials}</span>;
 }
 
 function StatusPill({ status }: { status: Status }) {
   const meta = statusMeta[status];
-  return <span style={{ color: meta.color, background: `${meta.color}2e` }} className="inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-semibold"><i style={{ background: meta.color }} className="h-2 w-2 rounded-full" />{meta.label}</span>;
+  return <span style={{ color: meta.color, background: `${meta.color}2e` }} className="inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-caption font-semibold"><i style={{ background: meta.color }} className="h-2 w-2 rounded-full" />{meta.label}</span>;
 }
 
 function CircleButton({ children, onClick, light = false, label, className }: { children: React.ReactNode; onClick?: () => void; light?: boolean; label?: string; className?: string }) {
@@ -133,14 +133,14 @@ function AuthScreen() {
       <div className="grid h-24 w-24 shrink-0 place-items-center rounded-[28px] border border-white/35 bg-white/15">
         <Asset src="/figma-flame.svg" className="h-12 w-12" />
       </div>
-      <h1 className="mt-7 text-5xl font-extrabold tracking-[-.02em]">Embers</h1>
-      <h2 className="mt-4 text-xl font-semibold">Вся команда на одной карте</h2>
-      <p className="mt-3 text-[15px] leading-5 text-[#ebebf599]">Кто где, что делает и сколько осталось —<br />в реальном времени на любом событии</p>
+      <h1 className="mt-7 text-display font-extrabold tracking-[-.02em]">Embers</h1>
+      <h2 className="mt-4 text-body font-semibold">Вся команда на одной карте</h2>
+      <p className="mt-3 text-callout leading-5 text-[#ebebf599]">Кто где, что делает и сколько осталось —<br />в реальном времени на любом событии</p>
     </div>
     <div className="shrink-0 space-y-3 pb-[max(24px,env(safe-area-inset-bottom))]">
-      <Press onClick={() => setScreen("hub")} className="flex h-[54px] w-full items-center justify-center gap-2 rounded-full bg-white text-[17px] font-semibold text-black"><Asset src="/figma-apple.svg" />Войти через Apple</Press>
-      <Press onClick={() => open("phone")} className="flex h-[54px] w-full items-center justify-center gap-2 rounded-full border border-white/30 bg-white/15 text-[17px] font-semibold"><Asset src="/figma-phone.svg" />Войти по номеру</Press>
-      <p className="px-4 pt-2 text-xs leading-4 text-[#ebebf599]">Продолжая, вы принимаете Условия использования<br />и Политику конфиденциальности</p>
+      <Press onClick={() => setScreen("hub")} className="flex h-[54px] w-full items-center justify-center gap-2 rounded-full bg-white text-body font-semibold text-black"><Asset src="/figma-apple.svg" />Войти через Apple</Press>
+      <Press onClick={() => open("phone")} className="flex h-[54px] w-full items-center justify-center gap-2 rounded-full border border-white/30 bg-white/15 text-body font-semibold"><Asset src="/figma-phone.svg" />Войти по номеру</Press>
+      <p className="px-4 pt-2 text-caption leading-4 text-[#ebebf599]">Продолжая, вы принимаете Условия использования<br />и Политику конфиденциальности</p>
     </div>
   </div>;
 }
@@ -169,15 +169,15 @@ function HubHeader() {
   const [menu, setMenu] = useState(false);
   return <div className="absolute inset-x-5 top-(--chrome-top) z-20 flex h-11 items-center">
     <button onClick={() => setMenu((value) => !value)} className="flex items-center text-left" aria-expanded={menu}>
-      <h1 className="text-[34px] font-bold tracking-tight">События</h1>
+      <h1 className="text-title font-bold tracking-tight">События</h1>
       <ChevronDown size={22} className={cn("ml-1 text-white/60 transition-transform", menu && "rotate-180")} />
     </button>
     <div className="ml-auto flex gap-2">
       <CircleButton onClick={startCreate} label="Новое событие"><Plus size={22} /></CircleButton>
-      <button onClick={() => open("account")} aria-label="Аккаунт" className="grid h-11 w-11 place-items-center rounded-full bg-[#9c613d] text-base font-semibold">ВФ</button>
+      <button onClick={() => open("account")} aria-label="Аккаунт" className="grid h-11 w-11 place-items-center rounded-full bg-[#9c613d] text-body font-semibold">ВФ</button>
     </div>
     {menu && <div className="absolute left-0 top-14 max-h-80 w-64 overflow-y-auto rounded-2xl bg-[#2c2c2e] shadow-2xl">
-      {events.length ? events.map((item) => <button key={item.id} onClick={() => { selectEvent(item.id); setMenu(false); setScreen("live"); }} className="flex h-14 w-full items-center px-4 text-left text-[17px]">{item.details.title || "Без названия"}</button>) : <p className="px-4 py-4 text-[15px] text-white/60">Нет текущих событий</p>}
+      {events.length ? events.map((item) => <button key={item.id} onClick={() => { selectEvent(item.id); setMenu(false); setScreen("live"); }} className="flex h-14 w-full items-center px-4 text-left text-body">{item.details.title || "Без названия"}</button>) : <p className="px-4 py-4 text-callout text-white/60">Нет текущих событий</p>}
     </div>}
   </div>;
 }
@@ -190,12 +190,12 @@ function EmptyHub({ archived }: { archived: boolean }) {
     <div className="absolute left-[38px] right-[38px] top-[calc(120px+var(--chrome-shift))] h-10 rounded-[30px] bg-white/[.07]" />
     <div className="absolute inset-x-5 top-[calc(136px+var(--chrome-shift))] flex h-[330px] flex-col items-center rounded-[32px] border border-white/[.08] bg-white/10 text-center">
       <span className="mt-[34px] grid h-[104px] w-[104px] place-items-center rounded-full bg-orange-500/25"><CalendarDays size={48} className="text-[#ff6b00]" /></span>
-      <h2 className="mt-6 text-[26px] font-bold">{archived ? "События в архиве" : "Пока нет событий"}</h2>
-      <p className="mt-2 px-5 text-[15px] leading-5 text-[#ebebf599]">{archived ? <>Прошедшие события лежат в настройках<br />и хранятся там 7 дней</> : <>Создайте событие и пригласите команду<br />или присоединитесь по ссылке<br />от организатора</>}</p>
+      <h2 className="mt-6 text-title font-bold">{archived ? "События в архиве" : "Пока нет событий"}</h2>
+      <p className="mt-2 px-5 text-callout leading-5 text-[#ebebf599]">{archived ? <>Прошедшие события лежат в настройках<br />и хранятся там 7 дней</> : <>Создайте событие и пригласите команду<br />или присоединитесь по ссылке<br />от организатора</>}</p>
     </div>
     <div className="absolute inset-x-5 top-[calc(516px+var(--chrome-shift))] space-y-3">
-      <Press onClick={startCreate} className="flex h-[54px] w-full items-center justify-center gap-2 rounded-full bg-[#ff6b00] text-[17px] font-semibold"><Plus size={18} />Создать событие</Press>
-      <Press onClick={() => open("join")} className="flex h-[54px] w-full items-center justify-center gap-2 rounded-full border border-white/15 bg-white/15 text-[16px] font-semibold"><Link2 size={18} />Присоединиться по ссылке или коду</Press>
+      <Press onClick={startCreate} className="flex h-[54px] w-full items-center justify-center gap-2 rounded-full bg-[#ff6b00] text-body font-semibold"><Plus size={18} />Создать событие</Press>
+      <Press onClick={() => open("join")} className="flex h-[54px] w-full items-center justify-center gap-2 rounded-full border border-white/15 bg-white/15 text-body font-semibold"><Link2 size={18} />Присоединиться по ссылке или коду</Press>
     </div>
   </div>;
 }
@@ -223,7 +223,7 @@ function ruDays(count: number) {
 }
 
 function EventStatusBadge({ phase, size = "card" }: { phase: EventPhase; size?: "card" | "board" }) {
-  const box = size === "card" ? "h-8 gap-1.5 px-3 text-[13px]" : "h-[30px] gap-1 px-3 text-[11px]";
+  const box = size === "card" ? "h-8 gap-1.5 px-3 text-caption" : "h-[30px] gap-1 px-3 text-caption";
   const label = phase === "live" ? "LIVE" : phase === "upcoming" ? "СКОРО" : "ПРОШЛО";
   const dot = phase === "live" ? "bg-red-500" : phase === "upcoming" ? "bg-[#ffd60a]" : "bg-white/45";
   return <span className={cn("inline-flex items-center rounded-full bg-black/30 font-bold", box, phase === "past" && "text-white/80")}><i className={cn("h-2 w-2 rounded-full", dot)} />{label}</span>;
@@ -237,15 +237,15 @@ function EventCard({ record, onOpen }: { record: EventRecord; onOpen: () => void
     {event.cover && <span className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${event.cover})` }} />}
     <div className="absolute -left-16 top-10 h-[300px] w-[300px] rounded-full bg-[radial-gradient(circle_at_35%_30%,#ffd18b_0%,#ff7a1c_35%,transparent_68%)] opacity-90 blur-sm" />
     <div className="absolute inset-x-0 bottom-0 h-80 bg-gradient-to-b from-transparent to-black/55" />
-    <span className="absolute left-4 top-4 flex h-8 items-center gap-1.5 rounded-full bg-white/20 px-3 text-[13px] font-semibold"><Asset src="/figma-crown.svg" className="h-3.5 w-3.5" />Организатор</span>
+    <span className="absolute left-4 top-4 flex h-8 items-center gap-1.5 rounded-full bg-white/20 px-3 text-caption font-semibold"><Asset src="/figma-crown.svg" className="h-3.5 w-3.5" />Организатор</span>
     <span className="absolute right-4 top-4"><EventStatusBadge phase={eventPhase(event, now.getTime())} /></span>
     <div className="absolute inset-x-0 bottom-8 flex flex-col items-center">
       <div className="flex justify-center -space-x-2">{team.slice(0, 4).map((m) => <Avatar key={m.id} member={m} size={36} />)}</div>
-      <h2 className="mt-4 text-[34px] font-extrabold tracking-tight">{event.title}</h2>
-      <p className="mt-1.5 text-[17px] font-semibold">{eventWhen(event)}</p>
-      <p className="mt-1 text-[15px] text-white/75">{event.venue}</p>
-      {event.description && <p className="mt-1 line-clamp-2 px-6 text-[13px] text-white/70">{event.description}</p>}
-      <span className="mt-4 flex h-9 items-center gap-2 rounded-full bg-white/20 px-4 text-[15px] font-semibold"><Asset src="/figma-users.svg" className="h-4 w-4" />{team.length} в команде</span>
+      <h2 className="mt-4 text-title font-extrabold tracking-tight">{event.title}</h2>
+      <p className="mt-1.5 text-body font-semibold">{eventWhen(event)}</p>
+      <p className="mt-1 text-callout text-white/75">{event.venue}</p>
+      {event.description && <p className="mt-1 line-clamp-2 px-6 text-caption text-white/70">{event.description}</p>}
+      <span className="mt-4 flex h-9 items-center gap-2 rounded-full bg-white/20 px-4 text-callout font-semibold"><Asset src="/figma-users.svg" className="h-4 w-4" />{team.length} в команде</span>
     </div>
   </motion.button>;
 }
@@ -411,7 +411,7 @@ function EventPager() {
       {events.map((item) => <div key={item.id} className="relative h-full shrink-0" style={{ width }} inert={item.id !== activeId}>
         {item.id === activeId && <>
           <motion.div style={{ opacity: archiveOpacity }} className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
-            <span className="rounded-full bg-white/15 px-4 py-2 text-[15px] font-semibold">В архив</span>
+            <span className="rounded-full bg-white/15 px-4 py-2 text-callout font-semibold">В архив</span>
           </motion.div>
           <motion.div style={{ opacity: deleteOpacity }} className="absolute inset-x-0 bottom-3 flex justify-center">
             <button type="button" onPointerDown={(pointer) => pointer.stopPropagation()} onClick={() => {
@@ -420,7 +420,7 @@ function EventPager() {
               const animation = animate(lift, -560, { duration: 0.22, ease: [0.4, 0, 1, 1] });
               motionControl.current = animation;
               void animation.finished.then(() => { busy.current = false; deleteEvent(item.id); });
-            }} className={cn("flex h-12 items-center gap-2 rounded-full bg-[#ff3b30] px-5 text-[16px] font-semibold shadow-[0_10px_24px_rgba(255,59,48,.35)]", !deleteReady && "pointer-events-none")}>
+            }} className={cn("flex h-12 items-center gap-2 rounded-full bg-[#ff3b30] px-5 text-body font-semibold shadow-[0_10px_24px_rgba(255,59,48,.35)]", !deleteReady && "pointer-events-none")}>
               <Trash2 size={18} />Удалить
             </button>
           </motion.div>
@@ -520,7 +520,7 @@ function LocationMap({ lat, lng }: { lat: number; lng: number }) {
       map?.remove();
     };
   }, [expanded, lat, lng, token]);
-  if (!token) return <div className="mt-4 grid h-52 place-items-center rounded-[22px] bg-black/30 px-6 text-center text-[13px] leading-5 text-white/50">Добавьте ключ Mapbox, чтобы показать карту</div>;
+  if (!token) return <div className="mt-4 grid h-52 place-items-center rounded-[22px] bg-black/30 px-6 text-center text-caption leading-5 text-white/50">Добавьте ключ Mapbox, чтобы показать карту</div>;
   const view = <div className={expanded ? "absolute inset-0 z-40 bg-[#111]" : "relative h-full w-full"}>
     <div ref={nodeRef} className="h-full w-full" />
     {expanded
@@ -558,33 +558,33 @@ function CreateEvent() {
     </div>
     <div className="px-5">
       <div className="rounded-[32px] bg-[#1a040861] px-5">
-        <input value={draft.title} onChange={(e) => updateDraft({ title: e.target.value })} placeholder="Название события" style={{ fontSize: "32px", fontWeight: 600, letterSpacing: "-0.03em" }} className="w-full bg-transparent py-8 text-center leading-tight outline-none placeholder:text-white/40" />
-        <button onClick={() => open("datetime")} className="flex w-full flex-col items-center gap-2 border-t border-white/15 py-5 text-center"><CalendarDays size={22} className="text-white/80" /><span className={cn("text-[20px] leading-6", draft.date ? "font-semibold" : "font-medium text-white/85")}>{draft.date ? eventWhen(draft) : "Дата события"}</span></button>
-        <button onClick={() => open("location")} className="flex w-full flex-col items-center gap-2 border-t border-white/15 py-5 text-center"><MapPin size={22} className="text-white/80" /><span className={cn("text-[20px] leading-6", draft.venue ? "font-semibold" : "font-medium text-white/85")}>{draft.venue ? eventPlace(draft) : "Выбрать локацию"}</span></button>
-        <textarea value={draft.description} onChange={(e) => updateDraft({ description: e.target.value })} placeholder="Описание" rows={1} style={{ fontSize: "32px", fontWeight: 600, letterSpacing: "-0.03em", fieldSizing: "content" }} className="w-full resize-none bg-transparent py-8 text-center leading-tight outline-none placeholder:text-white/40" />
+        <input value={draft.title} onChange={(e) => updateDraft({ title: e.target.value })} placeholder="Название события" style={{ fontSize: "28px", fontWeight: 600, letterSpacing: "-0.03em" }} className="w-full bg-transparent py-8 text-center leading-tight outline-none placeholder:text-white/40" />
+        <button onClick={() => open("datetime")} className="flex w-full flex-col items-center gap-2 border-t border-white/15 py-5 text-center"><CalendarDays size={22} className="text-white/80" /><span className={cn("text-body leading-6", draft.date ? "font-semibold" : "font-medium text-white/85")}>{draft.date ? eventWhen(draft) : "Дата события"}</span></button>
+        <button onClick={() => open("location")} className="flex w-full flex-col items-center gap-2 border-t border-white/15 py-5 text-center"><MapPin size={22} className="text-white/80" /><span className={cn("text-body leading-6", draft.venue ? "font-semibold" : "font-medium text-white/85")}>{draft.venue ? eventPlace(draft) : "Выбрать локацию"}</span></button>
+        <textarea value={draft.description} onChange={(e) => updateDraft({ description: e.target.value })} placeholder="Описание" rows={1} style={{ fontSize: "28px", fontWeight: 600, letterSpacing: "-0.03em", fieldSizing: "content" }} className="w-full resize-none bg-transparent py-8 text-center leading-tight outline-none placeholder:text-white/40" />
       </div>
       <div className="relative mt-3 rounded-[32px] bg-[#1a040861] px-5 py-6 text-center">
-        <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[#9c613d] text-base font-semibold">ВФ</span>
-        <p className="mt-3 text-[13px] text-white/60">Организатор</p>
-        <p className="text-[22px] font-semibold leading-7">Вадим Филатов</p>
+        <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[#9c613d] text-body font-semibold">ВФ</span>
+        <p className="mt-3 text-caption text-white/60">Организатор</p>
+        <p className="text-body font-semibold leading-7">Вадим Филатов</p>
       </div>
       {showMap && draft.venue && draft.lat != null && draft.lng != null && <div className="relative mt-3 rounded-[32px] bg-[#1a040861] px-5 pb-4 pt-5 text-center">
         <button aria-label="Скрыть карту" onClick={() => setShowMap(false)} className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full bg-white/10"><X size={16} /></button>
         <MapPin size={22} className="mx-auto text-[#8eb6ff]" />
-        <p className="mt-2 text-[20px] font-semibold leading-6">{placeTitle}</p>
-        {placeDetail && <p className="mt-1 text-[15px] text-white/75">{placeDetail}</p>}
+        <p className="mt-2 text-body font-semibold leading-6">{placeTitle}</p>
+        {placeDetail && <p className="mt-1 text-callout text-white/75">{placeDetail}</p>}
         <LocationMap lat={draft.lat} lng={draft.lng} />
       </div>}
       <div className="mt-3 rounded-[32px] bg-[#1a040861] px-5 py-4 text-center">
-        <p className="text-[13px] font-medium tracking-wide text-white/55">ДЛЯ КОМАНДЫ</p>
-        <button onClick={() => open("invite")} className="relative flex w-full flex-col items-center py-3.5"><span className="flex items-center gap-2 text-[20px] font-semibold"><Users size={20} />Команда</span><small className="mt-0.5 text-[14px] text-white/60">Добавьте людей и роли</small><ChevronRight size={18} className="absolute right-0 top-1/2 -translate-y-1/2 text-white/45" /></button>
-        <button onClick={() => open("files")} className="relative flex w-full flex-col items-center border-t border-white/15 py-3.5"><span className="flex items-center gap-2 text-[20px] font-semibold"><FileText size={20} />Программа</span><small className="mt-0.5 text-[14px] text-white/60">{files.length ? `${files.length} PDF` : "Проходки, инструкции и другие PDF"}</small><ChevronRight size={18} className="absolute right-0 top-1/2 -translate-y-1/2 text-white/45" /></button>
+        <p className="text-caption font-medium tracking-wide text-white/55">ДЛЯ КОМАНДЫ</p>
+        <button onClick={() => open("invite")} className="relative flex w-full flex-col items-center py-3.5"><span className="flex items-center gap-2 text-body font-semibold"><Users size={20} />Команда</span><small className="mt-0.5 text-callout text-white/60">Добавьте людей и роли</small><ChevronRight size={18} className="absolute right-0 top-1/2 -translate-y-1/2 text-white/45" /></button>
+        <button onClick={() => open("files")} className="relative flex w-full flex-col items-center border-t border-white/15 py-3.5"><span className="flex items-center gap-2 text-body font-semibold"><FileText size={20} />Программа</span><small className="mt-0.5 text-callout text-white/60">{files.length ? `${files.length} PDF` : "Проходки, инструкции и другие PDF"}</small><ChevronRight size={18} className="absolute right-0 top-1/2 -translate-y-1/2 text-white/45" /></button>
       </div>
     </div>
     </div>
     </div>
     <div className="absolute left-5 top-(--chrome-top) z-30"><CircleButton onClick={() => setScreen("hub")} label="Назад" className="backdrop-blur-xl"><X size={20} /></CircleButton></div>
-    <button onClick={createEvent} className="absolute right-5 top-(--chrome-top) z-30 h-11 rounded-full bg-white/20 px-4 text-[15px] font-semibold backdrop-blur-xl">Создать</button>
+    <button onClick={createEvent} className="absolute right-5 top-(--chrome-top) z-30 h-11 rounded-full bg-white/20 px-4 text-callout font-semibold backdrop-blur-xl">Создать</button>
   </div>;
 }
 
@@ -637,7 +637,7 @@ function liveTimeline(schedules: Record<string, ScheduleBlock[]>, memberIds: rea
   return { moment, ranges };
 }
 
-const liveCueStyle = { fontSize: 16, fontWeight: 400, lineHeight: "24px" };
+const liveCueStyle = { fontSize: 17, fontWeight: 400, lineHeight: "24px" };
 
 function Timeline() {
   const now = useClock();
@@ -741,16 +741,16 @@ function Timeline() {
     window.addEventListener("pointerup", up);
   };
   const dayWidth = viewport > 0 ? (viewport / 6) * 24 : 0;
-  return <div className="rounded-[28px] bg-white/10 px-4 pb-[27px] pt-4">
+  return <div className="rounded-[28px] bg-white/10 p-5">
     {scrub === null ? <button type="button" onClick={() => alignLiveToStart()} className="text-[#ff6b00]" style={liveCueStyle}>сейчас</button> : <button type="button" onClick={() => alignLiveToStart(scrub)} className="text-[#ff6b00]" style={liveCueStyle}>вернуться к live</button>}
     <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4">
-      <p className="text-[48px] font-bold leading-[58px] tracking-[-0.04em] tabular">{label}</p>
-      <div className="text-right text-[15px] font-semibold leading-[18px]">
+      <p className="text-display font-bold leading-[58px] tracking-[-0.04em] tabular">{label}</p>
+      <div className="text-right text-callout font-semibold leading-[18px]">
         <p className="truncate">{moment ? moment.title : "Нет расписания"}</p>
         <p className="mt-0.5 truncate text-[#ff6b00]">{detail}</p>
       </div>
     </div>
-    {timeline && <div ref={scrollerRef} className="no-scrollbar mt-[14px] overflow-x-auto overflow-y-hidden">
+    {timeline && <div ref={scrollerRef} className="no-scrollbar mt-5 overflow-x-auto overflow-y-hidden">
       {dayWidth > 0 && <div style={{ width: dayWidth + 16 }} className="px-2">
         <div className="relative py-2">
           <div className="relative h-1.5">
@@ -784,8 +784,8 @@ function Timeline() {
           </div>
         </div>
         <div onPointerDown={panScale} className="relative z-20 mt-0.5 h-8 cursor-grab touch-pan-x select-none active:cursor-grabbing">
-          <div className="relative h-[13px] text-[11px] leading-[13px] text-white/45">
-            {Array.from({ length: 25 }, (_, hour) => <span key={hour} className="absolute top-0 w-4 -translate-x-1/2 text-center tabular" style={{ left: `${(hour / 24) * 100}%` }}>{hour}</span>)}
+          <div className="relative h-4 text-caption text-white/45">
+            {Array.from({ length: 25 }, (_, hour) => <span key={hour} className="absolute top-0 w-5 -translate-x-1/2 text-center tabular" style={{ left: `${(hour / 24) * 100}%` }}>{hour}</span>)}
           </div>
         </div>
       </div>}
@@ -798,14 +798,14 @@ function MapCard() {
   const team = useEmbersStore((s) => focusedEvent(s).team);
   const onSite = team.filter((member) => member.status === "on_site").length;
   const inTransit = team.filter((member) => member.status === "in_transit").length;
-  return <div className="rounded-[28px] bg-white/10 p-4"><h3 className="text-xl font-bold">Карта</h3><p className="mt-0.5 text-[11px] text-white/45">{onSite} на площадке · {inTransit} в пути</p>
-    <div className="relative mt-2 h-[164px] overflow-hidden rounded-[18px] bg-[#26262b]">
+  return <div className="rounded-[28px] bg-white/10 p-5"><h3 className="text-body font-bold">Карта</h3><p className="mt-2 text-caption text-white/45">{onSite} на площадке · {inTransit} в пути</p>
+    <div className="relative mt-5 h-[164px] overflow-hidden rounded-[18px] bg-[#26262b]">
       <i className="absolute -left-5 top-20 h-2 w-[420px] rotate-[8deg] bg-[#3a3a42]" /><i className="absolute left-28 -top-10 h-[260px] w-3 rotate-[8deg] bg-[#3a3a42]" /><i className="absolute right-14 -top-10 h-[260px] w-2 -rotate-12 bg-[#3a3a42]" />
       <span className="absolute right-10 top-3 h-[70px] w-[110px] rounded-[18px] bg-green-500/20" />
-      {team.some((member) => member.spot.includes("Сцена")) && <span className="absolute left-[168px] top-[72px] rounded-full bg-black/70 px-2 py-1 text-[9px] font-semibold">Сцена А</span>}
+      {team.some((member) => member.spot.includes("Сцена")) && <span className="absolute left-[168px] top-[72px] rounded-full bg-black/70 px-2 py-1 text-caption font-semibold">Сцена А</span>}
       {team.map((m) => <button key={m.id} onClick={() => open("member", m.id)} style={{ left: `${m.coords.x}%`, top: `${m.coords.y}%` }} className="absolute -translate-x-1/2 -translate-y-1/2"><Avatar member={m} size={30} /></button>)}
     </div>
-    <button className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-full bg-white/15 text-[13px] font-semibold"><Asset src="/figma-nav.svg" className="h-4 w-4" />Маршрут и карта</button>
+    <button className="mt-5 flex h-10 w-full items-center justify-center gap-2 rounded-full bg-white/15 text-caption font-semibold"><Asset src="/figma-nav.svg" className="h-4 w-4" />Маршрут и карта</button>
   </div>;
 }
 
@@ -830,12 +830,12 @@ function MemberRow({ member, role, revealed, onReveal, onClose }: { member: Memb
     else onClose();
     if (shouldOpen === revealed) void animate(x, shouldOpen ? -action : 0, swipeSpring);
   };
-  return <div className="relative mb-2 h-[104px] overflow-hidden rounded-[24px]">
+  return <div className="relative h-[104px] overflow-hidden rounded-[24px]">
     <div className="absolute inset-y-0 right-3 z-0 flex items-center">
       <motion.button type="button" aria-label={`Изменить расписание ${member.name}`} style={{ scale, opacity }} whileTap={{ scale: 0.9 }} onClick={() => openSchedule(member.id, "live")} className="grid h-11 w-11 place-items-center rounded-full bg-[#007AFF] text-white shadow-[0_8px_18px_rgba(0,122,255,0.4)]"><Pencil size={20} strokeWidth={2.2} /></motion.button>
     </div>
     <motion.button type="button" drag="x" dragConstraints={{ left: -action, right: 0 }} dragElastic={0.16} dragMomentum={false} dragDirectionLock style={{ x }} onDragEnd={(_, info) => finish(info)} onClick={() => { if (moved.current) { moved.current = false; return; } if (revealed) onClose(); else open("member", member.id); }} className="absolute inset-0 z-10 flex items-start gap-3 rounded-[24px] bg-[#1a1a1a] p-4 text-left">
-      <Avatar member={member} /><div className="min-w-0 flex-1"><div className="flex items-start justify-between"><div><b className="block text-[15px]">{member.name}</b><small className="text-[11px] text-white/45">{role}</small></div><StatusPill status={member.status} /></div><div className="mt-1 flex justify-between text-[13px]"><span>{member.spot}</span><b className="text-[#ff6b00]">{member.currentTask.split("· ").at(-1)}</b></div><p className="truncate text-[10px] text-white/40">дальше {member.next}</p></div>
+      <Avatar member={member} /><div className="min-w-0 flex-1"><div className="flex items-start justify-between"><div><b className="block text-callout">{member.name}</b><small className="text-caption text-white/45">{role}</small></div><StatusPill status={member.status} /></div><div className="mt-1 flex justify-between text-caption"><span>{member.spot}</span><b className="text-[#ff6b00]">{member.currentTask.split("· ").at(-1)}</b></div><p className="truncate text-caption text-white/40">дальше {member.next}</p></div>
     </motion.button>
   </div>;
 }
@@ -850,37 +850,38 @@ function TeamList() {
   const [swipedId, setSwipedId] = useState<string | null>(null);
   const counts = { all: team.length, on_site: team.filter((member) => member.status === "on_site").length, in_transit: team.filter((member) => member.status === "in_transit").length };
   const visible = filter === "all" ? team : team.filter((m) => m.status === filter);
-  return <><LayoutGroup><div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 py-3">
-    {([["all", `Все · ${counts.all}`], ["on_site", `На площадке · ${counts.on_site}`], ["in_transit", `В пути · ${counts.in_transit}`]] as const).map(([id, label]) => <button key={id} onClick={() => setFilter(id)} className={cn("relative shrink-0 rounded-full px-3 py-2 text-[13px]", filter === id ? "text-black" : "bg-white/10")} >{filter === id && <motion.i layoutId="filter" transition={spring} className="absolute inset-0 rounded-full bg-white" />}<span className="relative">{label}</span></button>)}
+  return <div className="flex flex-col gap-5">
+    <LayoutGroup><div className="no-scrollbar flex gap-5 overflow-x-auto">
+    {([["all", `Все · ${counts.all}`], ["on_site", `На площадке · ${counts.on_site}`], ["in_transit", `В пути · ${counts.in_transit}`]] as const).map(([id, label]) => <button key={id} onClick={() => setFilter(id)} className={cn("relative shrink-0 rounded-full px-3 py-2 text-caption", filter === id ? "text-black" : "bg-white/10")} >{filter === id && <motion.i layoutId="filter" transition={spring} className="absolute inset-0 rounded-full bg-white" />}<span className="relative">{label}</span></button>)}
   </div></LayoutGroup>
-    <div className="mb-3 flex items-center"><h2 className="text-xl font-bold">Команда</h2><button type="button" onClick={() => open("invite")} className="ml-auto flex h-9 items-center gap-1.5 rounded-full bg-[#ff6b00] px-3 text-[13px] font-semibold"><Plus size={16} />Добавить</button></div>
-    {team.length === 0 && <p className="mb-3 text-[14px] leading-5 text-white/45">Пока никого нет. Добавьте участника или отправьте приглашение.</p>}
-    <AnimatePresence mode="popLayout">{visible.map((m) => <MemberRow key={m.id} member={m} role={roles[m.id] ?? m.role} revealed={swipedId === m.id} onReveal={() => setSwipedId(m.id)} onClose={() => setSwipedId((current) => current === m.id ? null : current)} />)}</AnimatePresence></>;
+    <div className="flex items-center"><h2 className="text-body font-bold">Команда</h2><button type="button" onClick={() => open("invite")} className="ml-auto flex h-9 items-center gap-1.5 rounded-full bg-[#ff6b00] px-3 text-caption font-semibold"><Plus size={16} />Добавить</button></div>
+    {team.length === 0 && <p className="text-callout leading-5 text-white/45">Пока никого нет. Добавьте участника или отправьте приглашение.</p>}
+    <div className="flex flex-col gap-5"><AnimatePresence mode="popLayout">{visible.map((m) => <MemberRow key={m.id} member={m} role={roles[m.id] ?? m.role} revealed={swipedId === m.id} onReveal={() => setSwipedId(m.id)} onClose={() => setSwipedId((current) => current === m.id ? null : current)} />)}</AnimatePresence></div>
+  </div>;
 }
 
 function LiveBoard() {
   const setScreen = useEmbersStore((s) => s.setScreen);
   const open = useEmbersStore((s) => s.openSheet);
   const record = useEmbersStore(focusedEvent);
-  const now = useClock();
   const myStatus = record.myStatus;
   const event = record.details;
-  return <div className="relative min-h-[1520px] bg-black pb-[max(32px,env(safe-area-inset-bottom))]" data-node-id="2:598">
-    <div className="figma-gradient pointer-events-none absolute inset-x-0 top-0 h-[416px]" />
-    <div className="absolute left-5 top-(--chrome-top) z-30"><CircleButton onClick={() => setScreen("hub")} label="Назад"><Asset src="/figma-back.svg" /></CircleButton></div>
-    <div className="absolute right-5 top-(--chrome-top) z-30 flex gap-2"><CircleButton label="Поделиться" onClick={() => { void shareInvite(event.title, record.code).then(shareResult); }}><Asset src="/figma-share.svg" /></CircleButton><button onClick={() => open("account")} aria-label="Аккаунт" className="grid h-11 w-11 place-items-center rounded-full bg-[#9c613d] text-sm font-semibold">ВФ</button></div>
-    <div className="relative z-0 px-5 pt-[calc(104px+var(--chrome-shift))]">
-      <div className="text-center"><EventStatusBadge phase={eventPhase(event, now.getTime())} size="board" /><h1 className="mt-2 text-[28px] font-extrabold tracking-tight">{event.title}</h1><p className="text-[11px] text-white/85">{event.dateLabel} · {event.venue}</p></div>
-      <div className="mt-4"><Timeline /></div>
-      <div className="mt-3 flex h-[52px] items-center rounded-[22px] bg-white/10 px-3"><span className="grid h-9 w-9 place-items-center rounded-full" style={{ background: `${statusMeta[myStatus].color}33` }}><MapPin size={18} style={{ color: statusMeta[myStatus].color }} /></span><div className="ml-3 flex-1"><p className="text-[10px] text-white/45">Мой статус</p><p className="text-[13px] font-semibold">{statusMeta[myStatus].label}</p></div><button onClick={() => open("status")} className="h-9 rounded-full bg-[#ff6b00] px-4 text-xs font-semibold">Сменить</button></div>
-      <div className="mt-3"><MapCard /></div><TeamList />
+  return <div className="relative bg-black" data-node-id="2:598">
+    <div className="relative flex min-h-[100cqh] flex-col justify-end gap-5 px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-[calc(96px+var(--chrome-shift))]">
+      <div className="figma-gradient pointer-events-none absolute inset-0" />
+      <div className="absolute left-5 top-(--chrome-top) z-30"><CircleButton onClick={() => setScreen("hub")} label="Назад"><Asset src="/figma-back.svg" /></CircleButton></div>
+      <div className="absolute right-5 top-(--chrome-top) z-30 flex gap-2"><CircleButton label="Поделиться" onClick={() => { void shareInvite(event.title, record.code).then(shareResult); }}><Asset src="/figma-share.svg" /></CircleButton><button onClick={() => open("account")} aria-label="Аккаунт" className="grid h-11 w-11 place-items-center rounded-full bg-[#9c613d] text-callout font-semibold">ВФ</button></div>
+      <div className="relative z-0 text-center"><h1 className="text-title font-extrabold tracking-tight">{event.title}</h1><p className="mt-2 text-caption text-white/85">{event.dateLabel} · {event.venue}</p></div>
+      <div className="relative z-0"><Timeline /></div>
+      <div className="relative z-0 flex h-[52px] items-center gap-5 rounded-[22px] bg-white/10 px-5"><span className="grid h-9 w-9 place-items-center rounded-full" style={{ background: `${statusMeta[myStatus].color}33` }}><MapPin size={18} style={{ color: statusMeta[myStatus].color }} /></span><div className="min-w-0 flex-1"><p className="text-caption text-white/45">Мой статус</p><p className="text-caption font-semibold">{statusMeta[myStatus].label}</p></div><button onClick={() => open("status")} className="h-9 rounded-full bg-[#ff6b00] px-4 text-caption font-semibold">Сменить</button></div>
     </div>
+    <div className="relative z-0 flex flex-col gap-5 px-5 pb-[max(20px,env(safe-area-inset-bottom))]"><MapCard /><TeamList /></div>
   </div>;
 }
 
 function SheetHeader({ title, done = true, closeButton = true }: { title: string; done?: boolean; closeButton?: boolean }) {
   const close = useEmbersStore((s) => s.closeSheet);
-  return <div className="relative flex h-[58px] items-center justify-center">{closeButton && <CircleButton onClick={close}><X size={20} /></CircleButton>}<h2 className="absolute inset-x-16 text-center text-[17px] font-semibold">{title}</h2>{done && <div className="ml-auto"><CircleButton onClick={close} light><Check size={20} /></CircleButton></div>}</div>;
+  return <div className="relative flex h-[58px] items-center justify-center">{closeButton && <CircleButton onClick={close}><X size={20} /></CircleButton>}<h2 className="absolute inset-x-16 text-center text-body font-semibold">{title}</h2>{done && <div className="ml-auto"><CircleButton onClick={close} light><Check size={20} /></CircleButton></div>}</div>;
 }
 
 function QrScanner({ onCode }: { onCode: (code: string) => void }) {
@@ -951,17 +952,17 @@ function JoinSheet() {
     const found = text.toUpperCase().match(/[A-Z0-9]{6}/);
     if (found) setCode(found[0]);
   };
-  return <div data-node-id="2:273"><SheetHeader title="Присоединиться" /><p className="ml-5 mt-2 text-[12px] text-white/50">КОД ПРИГЛАШЕНИЯ</p>
+  return <div data-node-id="2:273"><SheetHeader title="Присоединиться" /><p className="ml-5 mt-2 text-caption text-white/50">КОД ПРИГЛАШЕНИЯ</p>
     <div className="relative mt-2">
       <input aria-label="Код приглашения" value={code} onChange={(e) => setCode(e.target.value)} className="absolute inset-0 z-10 opacity-0" />
-      <div className="grid grid-cols-6 gap-2">{Array.from({ length: 6 }).map((_, i) => <div key={i} className={cn("grid h-[62px] place-items-center rounded-[14px] bg-[#2c2c2e] text-[28px] font-semibold tabular", i === code.length && "border-2 border-[#ff6b00]")}>{code[i] ?? ""}</div>)}</div>
+      <div className="grid grid-cols-6 gap-2">{Array.from({ length: 6 }).map((_, i) => <div key={i} className={cn("grid h-[62px] place-items-center rounded-[14px] bg-[#2c2c2e] text-title font-semibold tabular", i === code.length && "border-2 border-[#ff6b00]")}>{code[i] ?? ""}</div>)}</div>
     </div>
-    <p className={cn("ml-5 mt-2 text-[12px]", error ? "text-red-400" : "text-white/50")}>{error || "Код есть в приглашении от организатора"}</p>
-    <div className="mt-4 overflow-hidden rounded-[20px] bg-[#2c2c2e]"><button onClick={pasteLink} className="flex h-[52px] w-full items-center gap-3 px-4 text-[17px]"><Asset src="/figma-link.svg" className="h-[22px] w-[22px]" />Вставить ссылку<ChevronRight className="ml-auto text-white/40" size={18} /></button><button onClick={() => setScanning((value) => !value)} className="flex h-[52px] w-full items-center gap-3 border-t border-white/15 px-4 text-[17px]"><Asset src="/figma-qr.svg" className="h-[22px] w-[22px]" />{scanning ? "Закрыть камеру" : "Сканировать QR-код"}<ChevronRight className="ml-auto text-white/40" size={18} /></button></div>
+    <p className={cn("ml-5 mt-2 text-caption", error ? "text-red-400" : "text-white/50")}>{error || "Код есть в приглашении от организатора"}</p>
+    <div className="mt-4 overflow-hidden rounded-[20px] bg-[#2c2c2e]"><button onClick={pasteLink} className="flex h-[52px] w-full items-center gap-3 px-4 text-body"><Asset src="/figma-link.svg" className="h-[22px] w-[22px]" />Вставить ссылку<ChevronRight className="ml-auto text-white/40" size={18} /></button><button onClick={() => setScanning((value) => !value)} className="flex h-[52px] w-full items-center gap-3 border-t border-white/15 px-4 text-body"><Asset src="/figma-qr.svg" className="h-[22px] w-[22px]" />{scanning ? "Закрыть камеру" : "Сканировать QR-код"}<ChevronRight className="ml-auto text-white/40" size={18} /></button></div>
     {scanning && <div className="mt-3 overflow-hidden rounded-[20px]"><QrScanner onCode={onCode} /></div>}
-    <p className="ml-5 mt-5 text-[12px] text-white/50">ПРЕДПРОСМОТР</p>
-    <div className="mt-2 rounded-[20px] bg-[#2c2c2e] p-4"><div className="flex items-center gap-3"><span className="h-14 w-14 rounded-[14px] bg-gradient-to-b from-[#ff8a1f] via-[#d2321c] to-[#3b0b22]" /><div><b className="text-[17px]">{event ? event.details.title : "Код ещё не совпал"}</b><p className="text-[12px] text-white/50">{event ? `Пригласил Вадим Филатов · ${event.team.length} в команде` : "Введите код события"}</p></div></div><div className="my-4 h-px bg-white/15" /><b className="text-[14px]">Выберите свою роль</b><div className="mt-3 flex flex-wrap gap-2">{["Свет","Звук","Видео","Фото","Продюсер","Площадка","Техник"].map((item) => <button key={item} onClick={() => setRole(item)} className={cn("h-9 rounded-full px-3.5 text-[14px]", role === item ? "bg-[#ff6b00]" : "bg-white/10")}>{item}</button>)}</div></div>
-    <button onClick={() => join()} className="mt-[98px] h-[54px] w-full rounded-full bg-[#ff6b00] text-[17px] font-semibold">Присоединиться</button>
+    <p className="ml-5 mt-5 text-caption text-white/50">ПРЕДПРОСМОТР</p>
+    <div className="mt-2 rounded-[20px] bg-[#2c2c2e] p-4"><div className="flex items-center gap-3"><span className="h-14 w-14 rounded-[14px] bg-gradient-to-b from-[#ff8a1f] via-[#d2321c] to-[#3b0b22]" /><div><b className="text-body">{event ? event.details.title : "Код ещё не совпал"}</b><p className="text-caption text-white/50">{event ? `Пригласил Вадим Филатов · ${event.team.length} в команде` : "Введите код события"}</p></div></div><div className="my-4 h-px bg-white/15" /><b className="text-callout">Выберите свою роль</b><div className="mt-3 flex flex-wrap gap-2">{["Свет","Звук","Видео","Фото","Продюсер","Площадка","Техник"].map((item) => <button key={item} onClick={() => setRole(item)} className={cn("h-9 rounded-full px-3.5 text-callout", role === item ? "bg-[#ff6b00]" : "bg-white/10")}>{item}</button>)}</div></div>
+    <button onClick={() => join()} className="mt-[98px] h-[54px] w-full rounded-full bg-[#ff6b00] text-body font-semibold">Присоединиться</button>
   </div>;
 }
 
@@ -971,7 +972,7 @@ function DateSheet() {
   const updateDraft = useEmbersStore((s) => s.updateDraft);
   const [zonesOpen, setZonesOpen] = useState(false);
   const setDate = (date: string) => { if (date) updateDraft({ date, dateLabel: formatDateLabel(date) }); };
-  return <div data-node-id="2:407"><SheetHeader title="Дата и время" /><div className="mt-2 overflow-hidden rounded-[20px] bg-[#2c2c2e]"><button onClick={toggleAllDay} className="flex h-[52px] w-full items-center px-4 text-[17px]">Весь день<span className={cn("ml-auto h-[31px] w-[51px] rounded-full p-0.5", draft.allDay ? "bg-[#34c759]" : "bg-[#39393d]")}><i className={cn("block h-[27px] w-[27px] rounded-full bg-white transition-transform", draft.allDay && "translate-x-5")} /></span></button><div className="flex h-[52px] items-center border-t border-white/15 px-4 text-[17px]">Дата<input type="date" value={draft.date} onChange={(e) => setDate(e.target.value)} className="ml-auto rounded-lg bg-white/10 px-2.5 py-1.5 outline-none [color-scheme:dark]" /></div>{!draft.allDay && <div className="flex h-[52px] items-center border-t border-white/15 px-4 text-[17px]">Начало<input type="time" value={draft.time} onChange={(e) => e.target.value && updateDraft({ time: e.target.value })} className="ml-auto rounded-lg bg-white/10 px-2.5 py-1.5 tabular outline-none [color-scheme:dark]" /></div>}<div className="flex h-[52px] items-center border-t border-white/15 px-4 text-[17px]">{draft.endTime ? <>Окончание<input type="time" value={draft.endTime} onChange={(e) => updateDraft({ endTime: e.target.value })} className="ml-auto rounded-lg bg-white/10 px-2.5 py-1.5 tabular outline-none [color-scheme:dark]" /><button onClick={() => updateDraft({ endTime: "" })} className="ml-3 text-[15px] text-white/50">Убрать</button></> : <button onClick={() => updateDraft({ endTime: "23:00" })} className="w-full text-left">Добавить время окончания</button>}</div></div><button onClick={() => setZonesOpen((value) => !value)} className="mt-4 flex h-[52px] w-full items-center rounded-[20px] bg-[#2c2c2e] px-4 text-[17px]">Часовой пояс<span className="ml-auto text-white/50">{draft.timezone}</span><ChevronRight size={18} className={cn("ml-2 text-white/40", zonesOpen && "rotate-90")} /></button>{zonesOpen && <div className="mt-2 overflow-hidden rounded-[20px] bg-[#2c2c2e]">{timezones.map((zone) => <button key={zone} onClick={() => { updateDraft({ timezone: zone }); setZonesOpen(false); }} className="flex h-12 w-full items-center border-t border-white/10 px-4 text-left first:border-t-0">{zone}{draft.timezone === zone && <Check size={16} className="ml-auto text-[#ff6b00]" />}</button>)}</div>}<p className="mt-3 px-4 text-[12px] leading-4 text-white/50">Время начала увидит вся команда. Тайминг программы<br />подстроится под эту дату автоматически.</p></div>;
+  return <div data-node-id="2:407"><SheetHeader title="Дата и время" /><div className="mt-2 overflow-hidden rounded-[20px] bg-[#2c2c2e]"><button onClick={toggleAllDay} className="flex h-[52px] w-full items-center px-4 text-body">Весь день<span className={cn("ml-auto h-[31px] w-[51px] rounded-full p-0.5", draft.allDay ? "bg-[#34c759]" : "bg-[#39393d]")}><i className={cn("block h-[27px] w-[27px] rounded-full bg-white transition-transform", draft.allDay && "translate-x-5")} /></span></button><div className="flex h-[52px] items-center border-t border-white/15 px-4 text-body">Дата<input type="date" value={draft.date} onChange={(e) => setDate(e.target.value)} className="ml-auto rounded-lg bg-white/10 px-2.5 py-1.5 outline-none [color-scheme:dark]" /></div>{!draft.allDay && <div className="flex h-[52px] items-center border-t border-white/15 px-4 text-body">Начало<input type="time" value={draft.time} onChange={(e) => e.target.value && updateDraft({ time: e.target.value })} className="ml-auto rounded-lg bg-white/10 px-2.5 py-1.5 tabular outline-none [color-scheme:dark]" /></div>}<div className="flex h-[52px] items-center border-t border-white/15 px-4 text-body">{draft.endTime ? <>Окончание<input type="time" value={draft.endTime} onChange={(e) => updateDraft({ endTime: e.target.value })} className="ml-auto rounded-lg bg-white/10 px-2.5 py-1.5 tabular outline-none [color-scheme:dark]" /><button onClick={() => updateDraft({ endTime: "" })} className="ml-3 text-callout text-white/50">Убрать</button></> : <button onClick={() => updateDraft({ endTime: "23:00" })} className="w-full text-left">Добавить время окончания</button>}</div></div><button onClick={() => setZonesOpen((value) => !value)} className="mt-4 flex h-[52px] w-full items-center rounded-[20px] bg-[#2c2c2e] px-4 text-body">Часовой пояс<span className="ml-auto text-white/50">{draft.timezone}</span><ChevronRight size={18} className={cn("ml-2 text-white/40", zonesOpen && "rotate-90")} /></button>{zonesOpen && <div className="mt-2 overflow-hidden rounded-[20px] bg-[#2c2c2e]">{timezones.map((zone) => <button key={zone} onClick={() => { updateDraft({ timezone: zone }); setZonesOpen(false); }} className="flex h-12 w-full items-center border-t border-white/10 px-4 text-left first:border-t-0">{zone}{draft.timezone === zone && <Check size={16} className="ml-auto text-[#ff6b00]" />}</button>)}</div>}<p className="mt-3 px-4 text-caption leading-4 text-white/50">Время начала увидит вся команда. Тайминг программы<br />подстроится под эту дату автоматически.</p></div>;
 }
 
 type MapPlace = { id: string; name: string; address: string; lat: number; lng: number };
@@ -1026,17 +1027,17 @@ function LocationSheet() {
     <SheetHeader title="Локация" />
     <div className="mt-1 flex h-11 items-center gap-2 rounded-full bg-[#2c2c2e] px-3.5 text-[#8e8e93]">
       <Search size={18} />
-      <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск локации" className="w-full bg-transparent text-[17px] text-white outline-none placeholder:text-[#8e8e93]" />
+      <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск локации" className="w-full bg-transparent text-body text-white outline-none placeholder:text-[#8e8e93]" />
       <button type="button" aria-label="Голосовой поиск" onClick={() => { if (!startDictation(setQuery)) setNotice("Голосовой поиск недоступен в этом браузере"); }} className="text-white"><Mic size={18} /></button>
     </div>
-    <p className="mb-2 ml-4 mt-6 text-[13px] text-white/45">Подсказки</p>
+    <p className="mb-2 ml-4 mt-6 text-caption text-white/45">Подсказки</p>
     <div className="overflow-hidden rounded-[22px] bg-[#2c2c2e]">
-      <button onClick={useCurrent} className="flex h-[64px] w-full items-center gap-3 px-4 text-left"><span className="grid h-9 w-9 place-items-center rounded-full bg-[#0A84FF]"><Navigation size={18} /></span><span className="text-[17px]">Текущее местоположение</span></button>
-      {suggestions.map((place) => <button key={place.id} onClick={() => choose(place)} className="flex h-[64px] w-full items-center gap-3 border-t border-white/10 px-4 text-left"><span className="grid h-9 w-9 place-items-center rounded-full bg-white/15"><MapPin size={18} /></span><span className="min-w-0 flex-1"><b className="block truncate text-[17px] font-normal">{place.name}</b><small className="block truncate text-[12px] text-white/45">{place.address}</small></span>{draft.lat === place.lat && draft.lng === place.lng && <Check size={18} className="text-[#0A84FF]" />}</button>)}
+      <button onClick={useCurrent} className="flex h-[64px] w-full items-center gap-3 px-4 text-left"><span className="grid h-9 w-9 place-items-center rounded-full bg-[#0A84FF]"><Navigation size={18} /></span><span className="text-body">Текущее местоположение</span></button>
+      {suggestions.map((place) => <button key={place.id} onClick={() => choose(place)} className="flex h-[64px] w-full items-center gap-3 border-t border-white/10 px-4 text-left"><span className="grid h-9 w-9 place-items-center rounded-full bg-white/15"><MapPin size={18} /></span><span className="min-w-0 flex-1"><b className="block truncate text-body font-normal">{place.name}</b><small className="block truncate text-caption text-white/45">{place.address}</small></span>{draft.lat === place.lat && draft.lng === place.lng && <Check size={18} className="text-[#0A84FF]" />}</button>)}
     </div>
-    <p className="mb-2 ml-4 mt-6 text-[13px] text-white/45">Название места</p>
-    <input value={draft.zone} onChange={(e) => updateDraft({ zone: e.target.value })} placeholder="Например, дом Вадима Филатова" className="h-12 w-full rounded-2xl bg-[#2c2c2e] px-4 text-[17px] outline-none placeholder:text-[#8e8e93]" />
-    <p className="mt-2 px-4 text-[13px] text-white/40">Необязательно. Будет видно в приглашении.</p>
+    <p className="mb-2 ml-4 mt-6 text-caption text-white/45">Название места</p>
+    <input value={draft.zone} onChange={(e) => updateDraft({ zone: e.target.value })} placeholder="Например, дом Вадима Филатова" className="h-12 w-full rounded-2xl bg-[#2c2c2e] px-4 text-body outline-none placeholder:text-[#8e8e93]" />
+    <p className="mt-2 px-4 text-caption text-white/40">Необязательно. Будет видно в приглашении.</p>
   </div>;
 }
 
@@ -1074,19 +1075,19 @@ function InviteSheet() {
   };
   return <div data-node-id="2:511">
     <SheetHeader title="Команда" />
-    <div className="mt-2 flex h-[150px] items-center gap-4 rounded-[20px] bg-[#2c2c2e] p-4"><span className="grid h-24 w-24 place-items-center rounded-2xl bg-white"><Asset src="/figma-qr-large.svg" className="h-[76px] w-[76px]" /></span><div><b className="text-[17px]">Пригласите команду</b><p className="text-[15px] text-[#ff6b00]">embers.app/j/{record.code}</p><p className="text-[12px] text-white/50">Код: {record.code}</p><button onClick={() => { void shareInvite(event.title || "Событие", record.code).then(shareResult); }} className="mt-3 flex h-9 items-center gap-2 rounded-full bg-[#ff6b00] px-3.5 text-[14px] font-semibold"><Share2 size={16} />Поделиться</button></div></div>
-    <p className="ml-5 mt-5 text-[12px] text-white/50">УЧАСТНИКИ · {team.length + 1 + openRoles.length}</p>
+    <div className="mt-2 flex h-[150px] items-center gap-4 rounded-[20px] bg-[#2c2c2e] p-4"><span className="grid h-24 w-24 place-items-center rounded-2xl bg-white"><Asset src="/figma-qr-large.svg" className="h-[76px] w-[76px]" /></span><div><b className="text-body">Пригласите команду</b><p className="text-callout text-[#ff6b00]">embers.app/j/{record.code}</p><p className="text-caption text-white/50">Код: {record.code}</p><button onClick={() => { void shareInvite(event.title || "Событие", record.code).then(shareResult); }} className="mt-3 flex h-9 items-center gap-2 rounded-full bg-[#ff6b00] px-3.5 text-callout font-semibold"><Share2 size={16} />Поделиться</button></div></div>
+    <p className="ml-5 mt-5 text-caption text-white/50">УЧАСТНИКИ · {team.length + 1 + openRoles.length}</p>
     <div className="mt-2 overflow-hidden rounded-[20px] bg-[#2c2c2e]">
       <button onClick={() => openSchedule("vadim")} className="flex h-[60px] w-full items-center gap-3 px-4 text-left"><span className="grid h-10 w-10 place-items-center rounded-full bg-[#ff6b00]">ВФ</span><div className="flex-1"><p>Вадим Филатов <Crown size={13} className="inline text-[#ff6b00]" /></p><small className="text-white/50">{roles.vadim}</small></div><ChevronRight size={18} className="text-white/40" /></button>
       {team.map((m) => <button key={m.id} onClick={() => openSchedule(m.id)} className="ml-4 flex h-[60px] w-[calc(100%-1rem)] items-center gap-3 border-t border-white/15 pr-4 text-left"><Avatar member={m} size={40} /><div className="flex-1"><p>{m.name}</p><small className="text-white/50">{roles[m.id] ?? m.role}</small></div><ChevronRight size={18} className="text-white/40" /></button>)}
-      {openRoles.map((role) => <div key={role} className="ml-4 flex h-[60px] items-center gap-3 border-t border-white/15 pr-4"><span className="grid h-10 w-10 place-items-center rounded-full bg-white/10 text-[13px]">+</span><div><p>{role}</p><small className="text-white/50">Свободная роль</small></div></div>)}
+      {openRoles.map((role) => <div key={role} className="ml-4 flex h-[60px] items-center gap-3 border-t border-white/15 pr-4"><span className="grid h-10 w-10 place-items-center rounded-full bg-white/10 text-caption">+</span><div><p>{role}</p><small className="text-white/50">Свободная роль</small></div></div>)}
       {addingPerson ? <div className="border-t border-white/15 px-4 py-3">
-        <input value={personName} onChange={(event) => setPersonName(event.target.value)} onKeyDown={(event) => event.key === "Enter" && savePerson()} placeholder="Имя" className="h-11 w-full bg-transparent text-[17px] outline-none placeholder:text-white/40" />
-        <input value={personRole} onChange={(event) => setPersonRole(event.target.value)} onKeyDown={(event) => event.key === "Enter" && savePerson()} placeholder="Роль" className="h-11 w-full border-t border-white/10 bg-transparent text-[17px] outline-none placeholder:text-white/40" />
-        <div className="mt-2 flex flex-wrap gap-2">{roleSuggestions.map((item) => <button key={item} type="button" onClick={() => setPersonRole(item)} className={cn("h-8 rounded-full px-3 text-[13px]", personRole === item ? "bg-[#ff6b00]" : "bg-white/10")}>{item}</button>)}</div>
-        <button type="button" onClick={savePerson} className="mt-3 h-10 rounded-full bg-[#ff6b00] px-4 text-[15px] font-semibold">Добавить</button>
+        <input value={personName} onChange={(event) => setPersonName(event.target.value)} onKeyDown={(event) => event.key === "Enter" && savePerson()} placeholder="Имя" className="h-11 w-full bg-transparent text-body outline-none placeholder:text-white/40" />
+        <input value={personRole} onChange={(event) => setPersonRole(event.target.value)} onKeyDown={(event) => event.key === "Enter" && savePerson()} placeholder="Роль" className="h-11 w-full border-t border-white/10 bg-transparent text-body outline-none placeholder:text-white/40" />
+        <div className="mt-2 flex flex-wrap gap-2">{roleSuggestions.map((item) => <button key={item} type="button" onClick={() => setPersonRole(item)} className={cn("h-8 rounded-full px-3 text-caption", personRole === item ? "bg-[#ff6b00]" : "bg-white/10")}>{item}</button>)}</div>
+        <button type="button" onClick={savePerson} className="mt-3 h-10 rounded-full bg-[#ff6b00] px-4 text-callout font-semibold">Добавить</button>
       </div> : <button onClick={() => setAddingPerson(true)} className="ml-4 flex h-[56px] w-[calc(100%-1rem)] items-center gap-3 border-t border-white/15 text-[#ff6b00]"><span className="grid h-10 w-10 place-items-center rounded-full bg-orange-500/15"><Plus /></span>Добавить участника</button>}
-      {adding ? <div className="ml-4 flex h-[56px] items-center gap-2 border-t border-white/15 pr-4"><input value={roleName} onChange={(e) => setRoleName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveRole()} placeholder="Название роли" className="h-10 flex-1 bg-transparent text-[17px] outline-none placeholder:text-white/40" /><button onClick={saveRole} className="h-9 rounded-full bg-[#ff6b00] px-3 text-[14px] font-semibold">Добавить</button></div> : <button onClick={() => setAdding(true)} className="ml-4 flex h-[56px] w-[calc(100%-1rem)] items-center gap-3 border-t border-white/15 text-[#ff6b00]"><span className="grid h-10 w-10 place-items-center rounded-full bg-orange-500/15"><Plus /></span>Добавить роль</button>}
+      {adding ? <div className="ml-4 flex h-[56px] items-center gap-2 border-t border-white/15 pr-4"><input value={roleName} onChange={(e) => setRoleName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveRole()} placeholder="Название роли" className="h-10 flex-1 bg-transparent text-body outline-none placeholder:text-white/40" /><button onClick={saveRole} className="h-9 rounded-full bg-[#ff6b00] px-3 text-callout font-semibold">Добавить</button></div> : <button onClick={() => setAdding(true)} className="ml-4 flex h-[56px] w-[calc(100%-1rem)] items-center gap-3 border-t border-white/15 text-[#ff6b00]"><span className="grid h-10 w-10 place-items-center rounded-full bg-orange-500/15"><Plus /></span>Добавить роль</button>}
     </div>
   </div>;
 }
@@ -1105,7 +1106,7 @@ function MemberSheet() {
   const next = member.next.split(" · ");
   const rows = [["Где", `${member.spot} · ${event.venue}`], [now[1] ? `Сейчас · ${now[1]}` : "Сейчас", now[0]], [next.length > 1 ? `Дальше · ${next[0]}` : "Дальше", next.at(-1) ?? member.next]];
   const missingPhone = () => useEmbersStore.getState().setNotice("Номер не указан");
-  return <div data-node-id="2:890"><div className="flex h-11"><CircleButton onClick={close}><X size={20} /></CircleButton></div><div className="flex flex-col items-center"><Avatar member={member} size={88} /><h2 className="mt-3 text-[26px] font-bold">{member.name}</h2><p className="text-[15px] text-white/50">{roleLine}</p><div className="mt-2"><StatusPill status={member.status} /></div></div><div className="mt-5 grid grid-cols-3 gap-4">{member.phone ? <a href={`tel:${member.phone}`} className="flex h-16 flex-col items-center justify-center gap-1 rounded-2xl bg-[#2c2c2e] text-[12px] font-medium text-[#ff6b00]"><Phone size={21} />Позвонить</a> : <button onClick={missingPhone} className="flex h-16 flex-col items-center justify-center gap-1 rounded-2xl bg-[#2c2c2e] text-[12px] font-medium text-[#ff6b00]"><Phone size={21} />Позвонить</button>}{member.phone ? <a href={`sms:${member.phone}`} className="flex h-16 flex-col items-center justify-center gap-1 rounded-2xl bg-[#2c2c2e] text-[12px] font-medium text-[#ff6b00]"><Sparkles size={21} />Написать</a> : <button onClick={missingPhone} className="flex h-16 flex-col items-center justify-center gap-1 rounded-2xl bg-[#2c2c2e] text-[12px] font-medium text-[#ff6b00]"><Sparkles size={21} />Написать</button>}<button onClick={close} className="flex h-16 flex-col items-center justify-center gap-1 rounded-2xl bg-[#2c2c2e] text-[12px] font-medium text-[#ff6b00]"><MapPin size={21} />На карте</button></div><div className="mt-4 overflow-hidden rounded-[20px] bg-[#2c2c2e] px-4">{rows.map(([label, value], i) => <div key={label} className={cn("flex h-16 flex-col justify-center pl-9", i > 0 && "border-t border-white/15")}><small className="text-white/50">{label}</small><span className="text-[17px]">{value}</span></div>)}</div><p className="ml-5 mt-4 text-[12px] text-white/50">ДЕНЬ {member.name.split(" ")[0].toUpperCase()}</p><div className="mt-2 rounded-[20px] bg-[#2c2c2e] p-4"><div className="relative flex gap-[3px]">{["w-[12%] bg-[#636366]","w-[22%] bg-[#5e5ce6]","w-[9%] bg-[#ffd60a]","w-[28%] bg-[#30d158]","w-[12%] bg-[#ff6b00]","flex-1 bg-[#5e5ce6]"].map((c,i) => <i key={i} className={cn("h-3 rounded",c)} />)}<b className="absolute left-[55%] -top-1.5 h-6 w-0.5 bg-white" /></div><div className="mt-3 flex justify-between text-[10px] text-white/50"><span>08</span><span>12</span><span>16</span><span>20</span><span>23</span></div></div></div>;
+  return <div data-node-id="2:890"><div className="flex h-11"><CircleButton onClick={close}><X size={20} /></CircleButton></div><div className="flex flex-col items-center"><Avatar member={member} size={88} /><h2 className="mt-3 text-title font-bold">{member.name}</h2><p className="text-callout text-white/50">{roleLine}</p><div className="mt-2"><StatusPill status={member.status} /></div></div><div className="mt-5 grid grid-cols-3 gap-4">{member.phone ? <a href={`tel:${member.phone}`} className="flex h-16 flex-col items-center justify-center gap-1 rounded-2xl bg-[#2c2c2e] text-caption font-medium text-[#ff6b00]"><Phone size={21} />Позвонить</a> : <button onClick={missingPhone} className="flex h-16 flex-col items-center justify-center gap-1 rounded-2xl bg-[#2c2c2e] text-caption font-medium text-[#ff6b00]"><Phone size={21} />Позвонить</button>}{member.phone ? <a href={`sms:${member.phone}`} className="flex h-16 flex-col items-center justify-center gap-1 rounded-2xl bg-[#2c2c2e] text-caption font-medium text-[#ff6b00]"><Sparkles size={21} />Написать</a> : <button onClick={missingPhone} className="flex h-16 flex-col items-center justify-center gap-1 rounded-2xl bg-[#2c2c2e] text-caption font-medium text-[#ff6b00]"><Sparkles size={21} />Написать</button>}<button onClick={close} className="flex h-16 flex-col items-center justify-center gap-1 rounded-2xl bg-[#2c2c2e] text-caption font-medium text-[#ff6b00]"><MapPin size={21} />На карте</button></div><div className="mt-4 overflow-hidden rounded-[20px] bg-[#2c2c2e] px-4">{rows.map(([label, value], i) => <div key={label} className={cn("flex h-16 flex-col justify-center pl-9", i > 0 && "border-t border-white/15")}><small className="text-white/50">{label}</small><span className="text-body">{value}</span></div>)}</div><p className="ml-5 mt-4 text-caption text-white/50">ДЕНЬ {member.name.split(" ")[0].toUpperCase()}</p><div className="mt-2 rounded-[20px] bg-[#2c2c2e] p-4"><div className="relative flex gap-[3px]">{["w-[12%] bg-[#636366]","w-[22%] bg-[#5e5ce6]","w-[9%] bg-[#ffd60a]","w-[28%] bg-[#30d158]","w-[12%] bg-[#ff6b00]","flex-1 bg-[#5e5ce6]"].map((c,i) => <i key={i} className={cn("h-3 rounded",c)} />)}<b className="absolute left-[55%] -top-1.5 h-6 w-0.5 bg-white" /></div><div className="mt-3 flex justify-between text-caption text-white/50"><span>08</span><span>12</span><span>16</span><span>20</span><span>23</span></div></div></div>;
 }
 
 function StatusSheet() {
@@ -1120,7 +1121,7 @@ function StatusSheet() {
     navigator.geolocation.getCurrentPosition(() => toggle(), () => useEmbersStore.getState().setNotice("Разрешите доступ к геопозиции"));
   };
   const items: Array<[Status,string,string,React.ReactNode]> = [["on_site","На площадке","Я на месте",<MapPin key="p" />],["in_transit","В пути","Еду, отмечу время в пути",<Navigation key="n" />],["ready","Готов","Можно начинать",<Check key="c" />],["gathering","Сбор","Собираю команду",<Users key="u" />]];
-  return <div data-node-id="2:960"><SheetHeader title="Мой статус" /><div className="mt-2 grid grid-cols-2 gap-4">{items.map(([id,label,sub,icon]) => <button key={id} onClick={() => update(id)} className={cn("relative flex h-[150px] flex-col items-start rounded-[24px] border-2 bg-[#2c2c2e] p-4 text-left", current===id ? "border-[#30d158]" : "border-transparent")}><span style={{ color: statusMeta[id].color, background: `${statusMeta[id].color}32` }} className="grid h-[52px] w-[52px] place-items-center rounded-full">{icon}</span><b className="mt-4 text-[17px]">{label}</b><small className="text-[12px] text-white/50">{sub}</small>{current===id && <span className="absolute right-4 top-4 grid h-6 w-6 place-items-center rounded-full bg-[#30d158] text-black"><Check size={15} /></span>}</button>)}</div><button onClick={requestShare} className="mt-5 flex h-[52px] w-full items-center rounded-[20px] bg-[#2c2c2e] px-4 text-[17px]">Делиться геопозицией<span className={cn("ml-auto h-[31px] w-[51px] rounded-full p-0.5",share?"bg-[#34c759]":"bg-[#39393d]")}><i className={cn("block h-[27px] w-[27px] rounded-full bg-white transition-transform",share&&"translate-x-5")} /></span></button><p className="mt-3 px-4 text-[12px] text-white/50">Команда увидит ваш статус и точку на карте</p></div>;
+  return <div data-node-id="2:960"><SheetHeader title="Мой статус" /><div className="mt-2 grid grid-cols-2 gap-4">{items.map(([id,label,sub,icon]) => <button key={id} onClick={() => update(id)} className={cn("relative flex h-[150px] flex-col items-start rounded-[24px] border-2 bg-[#2c2c2e] p-4 text-left", current===id ? "border-[#30d158]" : "border-transparent")}><span style={{ color: statusMeta[id].color, background: `${statusMeta[id].color}32` }} className="grid h-[52px] w-[52px] place-items-center rounded-full">{icon}</span><b className="mt-4 text-body">{label}</b><small className="text-caption text-white/50">{sub}</small>{current===id && <span className="absolute right-4 top-4 grid h-6 w-6 place-items-center rounded-full bg-[#30d158] text-black"><Check size={15} /></span>}</button>)}</div><button onClick={requestShare} className="mt-5 flex h-[52px] w-full items-center rounded-[20px] bg-[#2c2c2e] px-4 text-body">Делиться геопозицией<span className={cn("ml-auto h-[31px] w-[51px] rounded-full p-0.5",share?"bg-[#34c759]":"bg-[#39393d]")}><i className={cn("block h-[27px] w-[27px] rounded-full bg-white transition-transform",share&&"translate-x-5")} /></span></button><p className="mt-3 px-4 text-caption text-white/50">Команда увидит ваш статус и точку на карте</p></div>;
 }
 
 function RoleChip({ role, onSave }: { role: string; onSave: (role: string) => void }) {
@@ -1136,10 +1137,10 @@ function RoleChip({ role, onSave }: { role: string; onSave: (role: string) => vo
     setEditing(false);
   };
   if (editing) return <form onSubmit={(event) => { event.preventDefault(); commit(); }} className="flex h-9 max-w-full items-center gap-2 rounded-full bg-[#2c2c2e] pl-3.5 pr-2.5">
-    <input ref={inputRef} aria-label="Роль" value={value} onChange={(event) => setValue(event.target.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === "Escape") { skipSave.current = true; inputRef.current?.blur(); } }} placeholder="Роль" className="min-w-16 max-w-[220px] bg-transparent text-[15px] text-white outline-none [field-sizing:content]" />
+    <input ref={inputRef} aria-label="Роль" value={value} onChange={(event) => setValue(event.target.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === "Escape") { skipSave.current = true; inputRef.current?.blur(); } }} placeholder="Роль" className="min-w-16 max-w-[220px] bg-transparent text-callout text-white outline-none [field-sizing:content]" />
     <Pencil size={14} className="shrink-0 text-white/55" />
   </form>;
-  return <button type="button" onClick={() => { setValue(role); setEditing(true); }} className="flex h-9 max-w-full items-center gap-2 rounded-full bg-[#2c2c2e] pl-3.5 pr-2.5 text-[15px] text-white/85">
+  return <button type="button" onClick={() => { setValue(role); setEditing(true); }} className="flex h-9 max-w-full items-center gap-2 rounded-full bg-[#2c2c2e] pl-3.5 pr-2.5 text-callout text-white/85">
     <span className="truncate">{role}</span><Pencil size={14} className="shrink-0 text-white/55" />
   </button>;
 }
@@ -1183,9 +1184,9 @@ function ScheduleBlockCard({ block, onRemove, onChange, onDragStart }: { block: 
     setTimeEdit(false);
   };
   return <div className="relative rounded-[28px] bg-[#2c2c2e] p-4 shadow-[0_10px_30px_rgba(0,0,0,.18)]">
-    <div role="button" aria-label={`Переместить ${block.location}`} onPointerDown={onDragStart} className="flex cursor-grab touch-none items-center gap-2 active:cursor-grabbing"><GripVertical size={18} className="shrink-0 text-white/35" /><span style={{ background: block.color }} className="grid h-6 w-6 place-items-center rounded-md"><Camera size={15} /></span><b className="text-[19px]">{block.location}</b><button aria-label="Удалить локацию" onPointerDown={(event) => event.stopPropagation()} onClick={onRemove} className="ml-auto grid h-6 w-6 place-items-center rounded-full bg-[#636366]"><X size={14} /></button></div>
-    <p className="mt-3 text-[18px]">« {taskEdit ? <textarea ref={taskRef} aria-label="Задача" value={task} rows={1} onChange={(event) => setTask(event.target.value)} onBlur={commitTask} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); commitTask(); } if (event.key === "Escape") { skipTask.current = true; setTask(block.task); taskRef.current?.blur(); } }} placeholder="Что делает на этой локации" className="inline-block w-[calc(100%-2rem)] resize-none rounded-lg bg-[#ff6b0038] px-2 py-1 text-[#ff6b00] outline-none" /> : <button type="button" onClick={() => { setTask(block.task); setTaskEdit(true); }} className="rounded-lg bg-[#ff6b0038] px-2 py-1 text-left text-[#ff6b00]">{block.task}</button>} »</p>
-    <p className="mt-3 text-[18px]">с {timeEdit ? <span className="inline-flex items-center gap-1 rounded-lg bg-[#ff6b0038] px-2 py-1 text-[#ff6b00]" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) commitTime(); }}>
+    <div role="button" aria-label={`Переместить ${block.location}`} onPointerDown={onDragStart} className="flex cursor-grab touch-none items-center gap-2 active:cursor-grabbing"><GripVertical size={18} className="shrink-0 text-white/35" /><span style={{ background: block.color }} className="grid h-6 w-6 place-items-center rounded-md"><Camera size={15} /></span><b className="text-body">{block.location}</b><button aria-label="Удалить локацию" onPointerDown={(event) => event.stopPropagation()} onClick={onRemove} className="ml-auto grid h-6 w-6 place-items-center rounded-full bg-[#636366]"><X size={14} /></button></div>
+    <p className="mt-3 text-body">« {taskEdit ? <textarea ref={taskRef} aria-label="Задача" value={task} rows={1} onChange={(event) => setTask(event.target.value)} onBlur={commitTask} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); commitTask(); } if (event.key === "Escape") { skipTask.current = true; setTask(block.task); taskRef.current?.blur(); } }} placeholder="Что делает на этой локации" className="inline-block w-[calc(100%-2rem)] resize-none rounded-lg bg-[#ff6b0038] px-2 py-1 text-[#ff6b00] outline-none" /> : <button type="button" onClick={() => { setTask(block.task); setTaskEdit(true); }} className="rounded-lg bg-[#ff6b0038] px-2 py-1 text-left text-[#ff6b00]">{block.task}</button>} »</p>
+    <p className="mt-3 text-body">с {timeEdit ? <span className="inline-flex items-center gap-1 rounded-lg bg-[#ff6b0038] px-2 py-1 text-[#ff6b00]" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) commitTime(); }}>
       <input ref={startRef} aria-label="Начало" type="time" step={60} value={start} onChange={(event) => setStart(event.target.value)} className="bg-transparent tabular outline-none [color-scheme:dark]" />
       <span>–</span>
       <input ref={endRef} aria-label="Конец" type="time" step={60} value={end} onChange={(event) => setEnd(event.target.value)} className="bg-transparent tabular outline-none [color-scheme:dark]" />
@@ -1205,7 +1206,7 @@ function TravelGap({ minutes, onSave }: { minutes: number; onSave: (minutes: num
     if (Number.isFinite(next) && next >= 0) onSave(next);
     setEditing(false);
   };
-  return <div className="flex h-11 items-center justify-center text-[12px] text-[#8e8e93]"><Clock3 size={14} className="mr-1" />переход {editing ? <input ref={inputRef} aria-label="Время перехода" inputMode="numeric" value={value} onChange={(event) => setValue(event.target.value.replace(/\D/g, "").slice(0, 3))} onBlur={commit} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); commit(); } if (event.key === "Escape") { skip.current = true; setValue(String(minutes)); inputRef.current?.blur(); } }} className="mx-1 w-10 rounded-md bg-white/10 text-center tabular text-white outline-none" /> : <button type="button" onClick={() => { setValue(String(minutes)); setEditing(true); }} className="mx-1 rounded-md bg-white/10 px-1.5 tabular text-white">{minutes}</button>} мин</div>;
+  return <div className="flex h-11 items-center justify-center text-caption text-[#8e8e93]"><Clock3 size={14} className="mr-1" />переход {editing ? <input ref={inputRef} aria-label="Время перехода" inputMode="numeric" value={value} onChange={(event) => setValue(event.target.value.replace(/\D/g, "").slice(0, 3))} onBlur={commit} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); commit(); } if (event.key === "Escape") { skip.current = true; setValue(String(minutes)); inputRef.current?.blur(); } }} className="mx-1 w-10 rounded-md bg-white/10 text-center tabular text-white outline-none" /> : <button type="button" onClick={() => { setValue(String(minutes)); setEditing(true); }} className="mx-1 rounded-md bg-white/10 px-1.5 tabular text-white">{minutes}</button>} мин</div>;
 }
 
 function ScheduleRow({ block, index, marked, onRemove, onChange, onTravel }: { block: ScheduleBlock; index: number; marked: boolean; onRemove: () => void; onChange: (patch: { task?: string; time?: string }) => void; onTravel: (minutes: number) => void }) {
@@ -1345,21 +1346,21 @@ function ScheduleScreen() {
   };
   return <div ref={screenRef} className="relative h-full overflow-hidden bg-black" data-node-id={configured ? "4:88" : "4:2"}>
     <button type="button" aria-label="Назад" onClick={backToTeam} className="absolute left-5 top-(--chrome-top) z-30 grid h-11 w-11 place-items-center rounded-full border border-white/10 bg-[#28282ae6]"><Asset src="/figma-schedule-back.svg" className="h-6 w-6" /></button>
-    <div className="pointer-events-none absolute inset-x-[72px] top-(--chrome-top) z-30 flex h-11 items-center justify-center"><b className="truncate text-[16px]">Расписание {person.name}</b></div>
+    <div className="pointer-events-none absolute inset-x-[72px] top-(--chrome-top) z-30 flex h-11 items-center justify-center"><b className="truncate text-body">Расписание {person.name}</b></div>
     <div className="absolute left-1/2 top-[calc(96px+var(--chrome-shift))] z-30 w-max max-w-[calc(100%-40px)] -translate-x-1/2"><RoleChip key={memberId} role={role} onSave={(next) => setRole(memberId, next)} /></div>
     <motion.div ref={listRef} style={{ paddingBottom: listPad }} className="no-scrollbar absolute inset-x-5 top-[calc(148px+var(--chrome-shift))] bottom-0 overflow-y-auto overscroll-contain">
-      {!configured && <p className={cn("px-1 text-center text-[15px] leading-5", dragChip ? "text-[#ff6b00]" : "text-[#8e8e93]")}>{dragChip ? "Отпустите, чтобы добавить локацию" : <>Чтобы составить расписание {possessive}, добавьте<br />локации из области внизу. Их можно перетаскивать.</>}</p>}
+      {!configured && <p className={cn("px-1 text-center text-callout leading-5", dragChip ? "text-[#ff6b00]" : "text-[#8e8e93]")}>{dragChip ? "Отпустите, чтобы добавить локацию" : <>Чтобы составить расписание {possessive}, добавьте<br />локации из области внизу. Их можно перетаскивать.</>}</p>}
       {configured && <Reorder.Group as="div" axis="y" values={blocks} onReorder={reorder} className="relative pb-2">{blocks.map((b, i) => <ScheduleRow key={b.id} block={b} index={i} marked={Boolean(dragChip) && dropIndex === i} onRemove={() => remove(b.id)} onChange={(patch) => update(b.id, patch)} onTravel={(travel) => update(b.id, { travel })} />)}{dragChip && dropIndex === blocks.length && <div className="mt-2 h-0.5 rounded-full bg-[#ff6b00]" />}</Reorder.Group>}
     </motion.div>
     {wideScreen && typeof document !== "undefined" ? createPortal(<div aria-hidden style={{ bottom: blurBottom, height: collapsed / 2, WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, #000 100%)", maskImage: "linear-gradient(to bottom, transparent 0%, #000 100%)", WebkitBackdropFilter: "blur(24px)", backdropFilter: "blur(24px)" }} className="pointer-events-none fixed inset-x-0 z-10" />, document.body) : <div aria-hidden style={{ height: collapsed / 2, WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, #000 100%)", maskImage: "linear-gradient(to bottom, transparent 0%, #000 100%)", WebkitBackdropFilter: "blur(24px)", backdropFilter: "blur(24px)" }} className="pointer-events-none absolute inset-x-0 bottom-0 z-10" />}
     <motion.div ref={sheetRef} style={{ height: sheetHeight }} className="absolute inset-x-[21px] bottom-[max(20px,env(safe-area-inset-bottom))] z-20 flex flex-col overflow-hidden rounded-[34px] border border-white/10 bg-[#1e1e20] px-4 pb-4 shadow-[0_18px_48px_rgba(0,0,0,.55)]">
       <div role="button" aria-label={expanded ? "Свернуть список локаций" : "Раскрыть список локаций"} onPointerDown={dragHandle} className="flex h-7 shrink-0 cursor-grab touch-none items-center justify-center active:cursor-grabbing"><i className="h-[5px] w-[60px] rounded-full bg-[#6e6e73]" /></div>
-      <div className="flex shrink-0 gap-2"><div className="flex h-11 flex-1 items-center gap-2 rounded-full bg-[#3a3a3e] px-3 text-[#8e8e93]"><MapPin size={20} /><input value={locationName} onChange={(e) => setLocationName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addLocation()} placeholder="Новая локация" className="w-full bg-transparent text-[17px] text-white outline-none placeholder:text-[#8e8e93]" /></div><button onClick={() => addLocation()} className="grid h-11 w-11 place-items-center rounded-full bg-[#ff6b00]"><Plus size={24} /></button></div>
-      <div className="no-scrollbar mt-3 flex shrink-0 gap-2 overflow-x-auto">{groups.map((group) => <button key={group.name} onClick={() => setCategory((item) => item === group.name ? "" : group.name)} className={cn("shrink-0 rounded-full px-4 py-2 text-[15px] font-medium", category === group.name ? "bg-[#ff6b00] text-white" : "bg-[#3a3a3e] text-[#ff6b00]")}>{group.name}</button>)}</div>
-      {!configured && <p className="mt-3 shrink-0 text-[10px] font-semibold text-[#8e8e93]">СТАНДАРТНЫЕ ЛОКАЦИИ</p>}
-      <div className={cn("mt-2 min-h-0 flex-1 space-y-2", expanded ? "overflow-y-auto" : "overflow-hidden")}>{palette.map((location) => <button onPointerDown={(event) => beginChipDrag(location, event)} onClick={() => { if (suppressClick.current) { suppressClick.current = false; return; } add(location.name); }} key={location.id} className={cn("flex h-12 w-full items-center gap-3 rounded-full bg-[#2c2c2e] px-3 text-[17px]", dragChip?.name === location.name && "opacity-40")}><LocationMark icon={location.icon} color={location.color} />{location.name}{!configured && <Info size={20} className="ml-auto text-white/50" />}</button>)}</div>
+      <div className="flex shrink-0 gap-2"><div className="flex h-11 flex-1 items-center gap-2 rounded-full bg-[#3a3a3e] px-3 text-[#8e8e93]"><MapPin size={20} /><input value={locationName} onChange={(e) => setLocationName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addLocation()} placeholder="Новая локация" className="w-full bg-transparent text-body text-white outline-none placeholder:text-[#8e8e93]" /></div><button onClick={() => addLocation()} className="grid h-11 w-11 place-items-center rounded-full bg-[#ff6b00]"><Plus size={24} /></button></div>
+      <div className="no-scrollbar mt-3 flex shrink-0 gap-2 overflow-x-auto">{groups.map((group) => <button key={group.name} onClick={() => setCategory((item) => item === group.name ? "" : group.name)} className={cn("shrink-0 rounded-full px-4 py-2 text-callout font-medium", category === group.name ? "bg-[#ff6b00] text-white" : "bg-[#3a3a3e] text-[#ff6b00]")}>{group.name}</button>)}</div>
+      {!configured && <p className="mt-3 shrink-0 text-caption font-semibold text-[#8e8e93]">СТАНДАРТНЫЕ ЛОКАЦИИ</p>}
+      <div className={cn("mt-2 min-h-0 flex-1 space-y-2", expanded ? "overflow-y-auto" : "overflow-hidden")}>{palette.map((location) => <button onPointerDown={(event) => beginChipDrag(location, event)} onClick={() => { if (suppressClick.current) { suppressClick.current = false; return; } add(location.name); }} key={location.id} className={cn("flex h-12 w-full items-center gap-3 rounded-full bg-[#2c2c2e] px-3 text-body", dragChip?.name === location.name && "opacity-40")}><LocationMark icon={location.icon} color={location.color} />{location.name}{!configured && <Info size={20} className="ml-auto text-white/50" />}</button>)}</div>
     </motion.div>
-    {dragChip && <div className="pointer-events-none fixed z-[80] flex h-12 items-center gap-3 rounded-full bg-[#3a3a3e] px-3 text-[17px] shadow-2xl" style={{ left: dragChip.x, top: dragChip.y, transform: "translate(-50%, -60%) scale(1.04)" }}><LocationMark icon={dragChip.icon} color={dragChip.color} />{dragChip.name}</div>}
+    {dragChip && <div className="pointer-events-none fixed z-[80] flex h-12 items-center gap-3 rounded-full bg-[#3a3a3e] px-3 text-body shadow-2xl" style={{ left: dragChip.x, top: dragChip.y, transform: "translate(-50%, -60%) scale(1.04)" }}><LocationMark icon={dragChip.icon} color={dragChip.color} />{dragChip.name}</div>}
   </div>;
 }
 
@@ -1378,14 +1379,14 @@ function FilesSheet() {
   };
   return <div>
     <SheetHeader title="Программа" done={false} closeButton={false} />
-    <p className="mt-1 px-1 text-[13px] leading-5 text-white/50">Проходки на концерт, инструкции и любые другие PDF для команды.</p>
+    <p className="mt-1 px-1 text-caption leading-5 text-white/50">Проходки на концерт, инструкции и любые другие PDF для команды.</p>
     <input ref={inputRef} type="file" accept="application/pdf,.pdf" multiple className="hidden" onChange={(e) => pick(e.target.files)} />
-    <button onClick={() => inputRef.current?.click()} className="mt-4 flex h-[54px] w-full items-center justify-center gap-2 rounded-full bg-[#ff6b00] text-[17px] font-semibold"><Plus size={18} />Добавить PDF</button>
+    <button onClick={() => inputRef.current?.click()} className="mt-4 flex h-[54px] w-full items-center justify-center gap-2 rounded-full bg-[#ff6b00] text-body font-semibold"><Plus size={18} />Добавить PDF</button>
     <div className="mt-4 overflow-hidden rounded-[20px] bg-[#2c2c2e]">
-      {files.length === 0 && <p className="px-4 py-6 text-center text-[15px] text-white/45">Пока нет файлов</p>}
+      {files.length === 0 && <p className="px-4 py-6 text-center text-callout text-white/45">Пока нет файлов</p>}
       {files.map((file, index) => <div key={file.id} className={cn("flex items-center gap-3 px-4 py-3", index > 0 && "border-t border-white/10")}>
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#ff6b00]/20 text-[#ff6b00]"><FileText size={18} /></span>
-        <a href={file.url} target="_blank" rel="noreferrer" className="min-w-0 flex-1"><b className="block truncate text-[16px]">{file.name}</b><small className="text-white/45">{formatSize(file.size)}</small></a>
+        <a href={file.url} target="_blank" rel="noreferrer" className="min-w-0 flex-1"><b className="block truncate text-body">{file.name}</b><small className="text-white/45">{formatSize(file.size)}</small></a>
         <button aria-label="Удалить файл" onClick={() => removeFile(file.id)} className="grid h-8 w-8 place-items-center rounded-full bg-white/10"><X size={14} /></button>
       </div>)}
     </div>
@@ -1482,7 +1483,7 @@ function GroupPill({ name, selected, revealed, rowRef, onSelect, onOpen, onClose
     window.addEventListener("pointerup", up);
   };
   return <motion.div ref={wrapRef} className="flex h-11 shrink-0 items-center">
-    <motion.button type="button" data-selected={selected ? "true" : undefined} onPointerDown={onBubblePointerDown} onClick={() => { if (moved.current) { moved.current = false; return; } if (revealed) onClose(); else onSelect(); }} whileTap={{ scale: 0.96 }} transition={spring} className={cn("relative z-10 h-11 touch-pan-x rounded-full px-4 text-[15px] font-medium select-none", selected ? "bg-[#ff6b00] text-white" : "bg-[#3a3a3e] text-[#ff6b00]")}><span data-swipe="" onPointerDown={onTextPointerDown} className="inline-flex h-full touch-none items-center">{name}</span></motion.button>
+    <motion.button type="button" data-selected={selected ? "true" : undefined} onPointerDown={onBubblePointerDown} onClick={() => { if (moved.current) { moved.current = false; return; } if (revealed) onClose(); else onSelect(); }} whileTap={{ scale: 0.96 }} transition={spring} className={cn("relative z-10 h-11 touch-pan-x rounded-full px-4 text-callout font-medium select-none", selected ? "bg-[#ff6b00] text-white" : "bg-[#3a3a3e] text-[#ff6b00]")}><span data-swipe="" onPointerDown={onTextPointerDown} className="inline-flex h-full touch-none items-center">{name}</span></motion.button>
     <motion.div style={{ width: slot, marginLeft: gapPx, minWidth: 0 }} className="flex h-11 items-center justify-center overflow-hidden">
       <motion.button type="button" aria-label={`Удалить группу ${name}`} style={{ opacity: trashOpacity, scale: trashScale, rotate: trashRotate }} onClick={onDelete} className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#ff3b30] text-white shadow-[0_8px_16px_rgba(255,59,48,.35)]", !revealed && "pointer-events-none")}><Trash2 size={16} /></motion.button>
     </motion.div>
@@ -1496,13 +1497,13 @@ function LocationEditor({ id, onBack }: { id: string; onBack: () => void }) {
   useEffect(() => { if (!located) onBack(); }, [located, onBack]);
   if (!located) return null;
   return <div>
-    <div className="relative flex h-11 items-center"><button type="button" onClick={onBack} className="flex items-center text-[17px] text-[#0A84FF]"><ChevronLeft size={22} />Локации</button><h2 className="absolute inset-x-24 truncate text-center text-[17px] font-semibold">{located.name}</h2></div>
-    <div className="mt-4 flex items-center gap-3 rounded-[22px] bg-[#2c2c2e] px-4 py-3.5"><LocationMark icon={located.icon} color={located.color} size={56} /><div className="min-w-0"><p className="truncate text-[20px] font-semibold">{located.name}</p><p className="truncate text-[15px] text-white/45">{located.group}</p></div></div>
-    <p className="mb-2 ml-4 mt-6 text-[15px] text-white/50">Группа</p>
-    <div className="no-scrollbar flex gap-2 overflow-x-auto">{groups.map((group) => <button key={group.name} type="button" onClick={() => update(id, { group: group.name })} className={cn("h-11 shrink-0 rounded-full px-4 text-[15px] font-medium", located.group === group.name ? "bg-[#ff6b00] text-white" : "bg-[#3a3a3e] text-[#ff6b00]")}>{group.name}</button>)}</div>
-    <p className="mb-2 ml-4 mt-6 text-[15px] text-white/50">Иконка</p>
+    <div className="relative flex h-11 items-center"><button type="button" onClick={onBack} className="flex items-center text-body text-[#0A84FF]"><ChevronLeft size={22} />Локации</button><h2 className="absolute inset-x-24 truncate text-center text-body font-semibold">{located.name}</h2></div>
+    <div className="mt-4 flex items-center gap-3 rounded-[22px] bg-[#2c2c2e] px-4 py-3.5"><LocationMark icon={located.icon} color={located.color} size={56} /><div className="min-w-0"><p className="truncate text-body font-semibold">{located.name}</p><p className="truncate text-callout text-white/45">{located.group}</p></div></div>
+    <p className="mb-2 ml-4 mt-6 text-callout text-white/50">Группа</p>
+    <div className="no-scrollbar flex gap-2 overflow-x-auto">{groups.map((group) => <button key={group.name} type="button" onClick={() => update(id, { group: group.name })} className={cn("h-11 shrink-0 rounded-full px-4 text-callout font-medium", located.group === group.name ? "bg-[#ff6b00] text-white" : "bg-[#3a3a3e] text-[#ff6b00]")}>{group.name}</button>)}</div>
+    <p className="mb-2 ml-4 mt-6 text-callout text-white/50">Иконка</p>
     <div className="grid grid-cols-6 gap-2 rounded-[22px] bg-[#2c2c2e] p-3">{locationIconNames.map((icon) => { const Icon = locationIconMap[icon]; return <button key={icon} type="button" aria-label={locationIconLabel[icon]} aria-pressed={located.icon === icon} onClick={() => update(id, { icon })} className={cn("grid aspect-square place-items-center rounded-2xl", located.icon === icon ? "bg-[#ff6b00] text-white" : "bg-white/10 text-white/80")}><Icon size={22} /></button>; })}</div>
-    <p className="mb-2 ml-4 mt-6 text-[15px] text-white/50">Цвет</p>
+    <p className="mb-2 ml-4 mt-6 text-callout text-white/50">Цвет</p>
     <div className="flex justify-between rounded-[22px] bg-[#2c2c2e] px-4 py-3.5">{presetColors.map((color) => <button key={color} type="button" aria-label={`Цвет ${color}`} aria-pressed={located.color === color} onClick={() => update(id, { color })} style={{ background: color }} className={cn("h-8 w-8 rounded-full", located.color === color && "ring-2 ring-white ring-offset-2 ring-offset-[#2c2c2e]")} />)}</div>
   </div>;
 }
@@ -1557,15 +1558,15 @@ function PresetLocationsPage({ onBack }: { onBack: () => void }) {
   const closeEditor = useCallback(() => setEditingId(null), []);
   if (editingId) return <LocationEditor id={editingId} onBack={closeEditor} />;
   return <div>
-    <div className="relative flex h-11 items-center"><button type="button" onClick={onBack} className="flex items-center text-[17px] text-[#0A84FF]"><ChevronLeft size={22} />Настройки</button><h2 className="absolute inset-x-24 text-center text-[17px] font-semibold">Локации</h2></div>
-    <p className="mt-3 px-1 text-[13px] leading-5 text-white/45">Эти локации появляются внизу расписания. Их можно перетаскивать в программу человека.</p>
-    <div className="mt-4 flex items-center gap-2"><button type="button" aria-label="Новая группа" onClick={() => groupDraft === null ? setGroupDraft("") : submitGroup()} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#ff6b00]"><Plus size={24} /></button><div ref={rowRef} onPointerDown={(event) => { if (event.button !== 0 || event.target !== event.currentTarget || event.pointerType === "touch") return; const pointerId = event.pointerId; const startX = event.clientX; const startScroll = event.currentTarget.scrollLeft; const row = event.currentTarget; const move = (ev: PointerEvent) => { if (ev.pointerId !== pointerId) return; row.scrollLeft = startScroll - (ev.clientX - startX); }; const up = (ev: PointerEvent) => { if (ev.pointerId !== pointerId) return; window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); }; window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); }} className="no-scrollbar flex min-w-0 flex-1 touch-pan-x items-center gap-2 overflow-x-auto">{groupDraft !== null && <input ref={groupRef} value={groupDraft} onChange={(event) => setGroupDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitGroup(); } if (event.key === "Escape") setGroupDraft(null); }} placeholder="Новая группа" className="h-11 w-40 shrink-0 rounded-full bg-[#3a3a3e] px-4 text-[17px] outline-none placeholder:text-[#8e8e93]" />}{groups.map((group) => <GroupPill key={group.name} name={group.name} selected={category === group.name} revealed={openGroup === group.name} rowRef={rowRef} onSelect={() => { setCategory((item) => item === group.name ? "" : group.name); setOpenGroup(null); }} onOpen={() => setOpenGroup(group.name)} onClose={() => setOpenGroup((item) => item === group.name ? null : item)} onDelete={() => deleteGroup(group.name)} />)}</div></div>
-    <div className="mt-3 flex gap-2"><input value={name} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submit(); } }} placeholder="Новая локация" className="h-11 min-w-0 flex-1 rounded-full bg-[#3a3a3e] px-4 text-[17px] outline-none placeholder:text-[#8e8e93]" /><button type="button" aria-label="Добавить локацию" onClick={submit} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#ff6b00]"><Plus size={24} /></button></div>
+    <div className="relative flex h-11 items-center"><button type="button" onClick={onBack} className="flex items-center text-body text-[#0A84FF]"><ChevronLeft size={22} />Настройки</button><h2 className="absolute inset-x-24 text-center text-body font-semibold">Локации</h2></div>
+    <p className="mt-3 px-1 text-caption leading-5 text-white/45">Эти локации появляются внизу расписания. Их можно перетаскивать в программу человека.</p>
+    <div className="mt-4 flex items-center gap-2"><button type="button" aria-label="Новая группа" onClick={() => groupDraft === null ? setGroupDraft("") : submitGroup()} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#ff6b00]"><Plus size={24} /></button><div ref={rowRef} onPointerDown={(event) => { if (event.button !== 0 || event.target !== event.currentTarget || event.pointerType === "touch") return; const pointerId = event.pointerId; const startX = event.clientX; const startScroll = event.currentTarget.scrollLeft; const row = event.currentTarget; const move = (ev: PointerEvent) => { if (ev.pointerId !== pointerId) return; row.scrollLeft = startScroll - (ev.clientX - startX); }; const up = (ev: PointerEvent) => { if (ev.pointerId !== pointerId) return; window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); }; window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); }} className="no-scrollbar flex min-w-0 flex-1 touch-pan-x items-center gap-2 overflow-x-auto">{groupDraft !== null && <input ref={groupRef} value={groupDraft} onChange={(event) => setGroupDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitGroup(); } if (event.key === "Escape") setGroupDraft(null); }} placeholder="Новая группа" className="h-11 w-40 shrink-0 rounded-full bg-[#3a3a3e] px-4 text-body outline-none placeholder:text-[#8e8e93]" />}{groups.map((group) => <GroupPill key={group.name} name={group.name} selected={category === group.name} revealed={openGroup === group.name} rowRef={rowRef} onSelect={() => { setCategory((item) => item === group.name ? "" : group.name); setOpenGroup(null); }} onOpen={() => setOpenGroup(group.name)} onClose={() => setOpenGroup((item) => item === group.name ? null : item)} onDelete={() => deleteGroup(group.name)} />)}</div></div>
+    <div className="mt-3 flex gap-2"><input value={name} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submit(); } }} placeholder="Новая локация" className="h-11 min-w-0 flex-1 rounded-full bg-[#3a3a3e] px-4 text-body outline-none placeholder:text-[#8e8e93]" /><button type="button" aria-label="Добавить локацию" onClick={submit} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#ff6b00]"><Plus size={24} /></button></div>
     <div className="mt-3 overflow-hidden rounded-[22px] bg-[#2c2c2e]">
-      {!groups.length && <p className="px-4 py-6 text-center text-[15px] text-white/45">Добавьте группу кнопкой плюс</p>}
-      {current && current.locations.length === 0 && <p className="px-4 py-6 text-center text-[15px] text-white/45">В этой группе пока нет локаций</p>}
-      {!current && groups.length > 0 && visible.length === 0 && <p className="px-4 py-6 text-center text-[15px] text-white/45">Пока нет локаций</p>}
-      {visible.map((location, index) => <div key={location.id} className={cn("flex h-14 items-center gap-2 px-4", index > 0 && "border-t border-white/10")}><button type="button" onClick={() => setEditingId(location.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left"><LocationMark icon={location.icon} color={location.color} /><span className="min-w-0 flex-1 truncate text-[17px]">{location.name}</span><ChevronRight size={18} className="shrink-0 text-white/30" /></button><button type="button" aria-label={`Удалить ${location.name}`} onClick={() => remove(location.group, location.id)} className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/10"><X size={14} /></button></div>)}
+      {!groups.length && <p className="px-4 py-6 text-center text-callout text-white/45">Добавьте группу кнопкой плюс</p>}
+      {current && current.locations.length === 0 && <p className="px-4 py-6 text-center text-callout text-white/45">В этой группе пока нет локаций</p>}
+      {!current && groups.length > 0 && visible.length === 0 && <p className="px-4 py-6 text-center text-callout text-white/45">Пока нет локаций</p>}
+      {visible.map((location, index) => <div key={location.id} className={cn("flex h-14 items-center gap-2 px-4", index > 0 && "border-t border-white/10")}><button type="button" onClick={() => setEditingId(location.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left"><LocationMark icon={location.icon} color={location.color} /><span className="min-w-0 flex-1 truncate text-body">{location.name}</span><ChevronRight size={18} className="shrink-0 text-white/30" /></button><button type="button" aria-label={`Удалить ${location.name}`} onClick={() => remove(location.group, location.id)} className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/10"><X size={14} /></button></div>)}
     </div>
   </div>;
 }
@@ -1579,9 +1580,9 @@ function ArchivePage({ onBack }: { onBack: () => void }) {
   const time = now.getTime();
   const archived = events.filter((event) => event.archivedAt != null || eventPhase(event.details, time) === "past");
   return <div>
-    <div className="relative flex h-11 items-center"><button type="button" onClick={onBack} className="flex items-center text-[17px] text-[#0A84FF]"><ChevronLeft size={22} />Настройки</button><h2 className="absolute inset-x-24 text-center text-[17px] font-semibold">Архив</h2></div>
-    <p className="mt-3 px-1 text-[13px] leading-5 text-white/45">События в архиве хранятся 7 дней, затем архив очищается. Текущие можно вернуть на доску.</p>
-    {!archived.length && <p className="mt-8 text-center text-[15px] text-white/45">Архив пуст</p>}
+    <div className="relative flex h-11 items-center"><button type="button" onClick={onBack} className="flex items-center text-body text-[#0A84FF]"><ChevronLeft size={22} />Настройки</button><h2 className="absolute inset-x-24 text-center text-body font-semibold">Архив</h2></div>
+    <p className="mt-3 px-1 text-caption leading-5 text-white/45">События в архиве хранятся 7 дней, затем архив очищается. Текущие можно вернуть на доску.</p>
+    {!archived.length && <p className="mt-8 text-center text-callout text-white/45">Архив пуст</p>}
     <div className="mt-4 space-y-2.5">{archived.map((event) => {
       const phase = eventPhase(event.details, time);
       const days = archiveDaysLeft(event.details, time, event.archivedAt);
@@ -1589,7 +1590,7 @@ function ArchivePage({ onBack }: { onBack: () => void }) {
       const canRestore = event.archivedAt != null && phase !== "past";
       return <div key={event.id} className="flex items-center gap-3 rounded-[22px] bg-[#2c2c2e] px-4 py-3">
         <button type="button" onClick={() => { selectEvent(event.id); setScreen("live"); }} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-          <span className="min-w-0 flex-1"><b className="block truncate text-[17px] font-semibold">{event.details.title || "Без названия"}</b><small className="mt-0.5 block truncate text-[13px] text-white/45">{eventWhen(event.details)}</small><small className="mt-0.5 block text-[13px] text-white/45">{left}</small></span>
+          <span className="min-w-0 flex-1"><b className="block truncate text-body font-semibold">{event.details.title || "Без названия"}</b><small className="mt-0.5 block truncate text-caption text-white/45">{eventWhen(event.details)}</small><small className="mt-0.5 block text-caption text-white/45">{left}</small></span>
           <EventStatusBadge phase={phase} size="board" />
         </button>
         {canRestore && <button type="button" onClick={() => restoreEvent(event.id)} style={{ fontSize: 13, fontWeight: 600 }} className="shrink-0 rounded-full bg-white px-3.5 py-2 text-black">Вернуть</button>}
@@ -1616,9 +1617,9 @@ function AccountSheet() {
   if (page === "notifications" || page === "calendar" || page === "email") {
     const current = pages[page];
     return <div>
-      <div className="relative flex h-11 items-center"><button type="button" onClick={() => setPage("root")} className="flex items-center text-[17px] text-[#0A84FF]"><ChevronLeft size={22} />Настройки</button><h2 className="absolute inset-x-24 text-center text-[17px] font-semibold">{current.title}</h2></div>
-      <div className="mt-4 flex h-[52px] items-center rounded-[22px] bg-[#2c2c2e] px-4 text-[17px]">{current.title}<span className="ml-auto"><SettingsSwitch on={prefs[current.key]} onToggle={() => setPref(current.key, !prefs[current.key])} /></span></div>
-      <p className="mt-2 px-4 text-[13px] leading-5 text-white/45">{current.text}</p>
+      <div className="relative flex h-11 items-center"><button type="button" onClick={() => setPage("root")} className="flex items-center text-body text-[#0A84FF]"><ChevronLeft size={22} />Настройки</button><h2 className="absolute inset-x-24 text-center text-body font-semibold">{current.title}</h2></div>
+      <div className="mt-4 flex h-[52px] items-center rounded-[22px] bg-[#2c2c2e] px-4 text-body">{current.title}<span className="ml-auto"><SettingsSwitch on={prefs[current.key]} onToggle={() => setPref(current.key, !prefs[current.key])} /></span></div>
+      <p className="mt-2 px-4 text-caption leading-5 text-white/45">{current.text}</p>
     </div>;
   }
   if (page === "locations") return <PresetLocationsPage onBack={() => setPage("root")} />;
@@ -1630,33 +1631,33 @@ function AccountSheet() {
       terms: ["Условия", "Продолжая пользоваться Embers, вы соглашаетесь с правилами сервиса. Это демонстрационная версия."],
     }[page];
     return <div>
-      <div className="relative flex h-11 items-center"><button type="button" onClick={() => setPage("root")} className="flex items-center text-[17px] text-[#0A84FF]"><ChevronLeft size={22} />Настройки</button><h2 className="absolute inset-x-24 text-center text-[17px] font-semibold">{copy[0]}</h2></div>
-      <p className="mt-4 px-1 text-[17px] leading-6 text-white/80">{copy[1]}</p>
+      <div className="relative flex h-11 items-center"><button type="button" onClick={() => setPage("root")} className="flex items-center text-body text-[#0A84FF]"><ChevronLeft size={22} />Настройки</button><h2 className="absolute inset-x-24 text-center text-body font-semibold">{copy[0]}</h2></div>
+      <p className="mt-4 px-1 text-body leading-6 text-white/80">{copy[1]}</p>
     </div>;
   }
   const stateLabel = (on: boolean) => on ? "Вкл" : "Выкл";
   return <div>
-    <div className="relative flex h-11 items-center justify-center"><h2 className="text-[17px] font-semibold">Настройки</h2><div className="absolute right-0"><CircleButton onClick={close} light><Check size={20} /></CircleButton></div></div>
-    <div className="mt-3 flex items-center gap-3 rounded-[22px] bg-[#2c2c2e] px-4 py-3.5"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#9c613d] text-base font-semibold">ВФ</span><div className="min-w-0"><p className="text-[17px] font-semibold">Вадим Филатов</p><p className="truncate text-[15px] text-white/45">{accountEmail}</p></div></div>
-    <p className="mt-2 px-4 text-[13px] leading-5 text-white/45">Вы вошли с Apple ID. Имя и фото можно сменить, когда будете отвечать на приглашение.</p>
-    <p className="mb-2 ml-4 mt-5 text-[15px] text-white/50">События</p>
-    <button type="button" onClick={() => setPage("archive")} className="flex h-[54px] w-full items-center rounded-[22px] bg-[#2c2c2e] px-4 text-left text-[17px]">Архив<span className="ml-auto text-white/45">{archiveCount}</span><ChevronRight size={18} className="ml-1 text-white/30" /></button>
+    <div className="relative flex h-11 items-center justify-center"><h2 className="text-body font-semibold">Настройки</h2><div className="absolute right-0"><CircleButton onClick={close} light><Check size={20} /></CircleButton></div></div>
+    <div className="mt-3 flex items-center gap-3 rounded-[22px] bg-[#2c2c2e] px-4 py-3.5"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#9c613d] text-body font-semibold">ВФ</span><div className="min-w-0"><p className="text-body font-semibold">Вадим Филатов</p><p className="truncate text-callout text-white/45">{accountEmail}</p></div></div>
+    <p className="mt-2 px-4 text-caption leading-5 text-white/45">Вы вошли с Apple ID. Имя и фото можно сменить, когда будете отвечать на приглашение.</p>
+    <p className="mb-2 ml-4 mt-5 text-callout text-white/50">События</p>
+    <button type="button" onClick={() => setPage("archive")} className="flex h-[54px] w-full items-center rounded-[22px] bg-[#2c2c2e] px-4 text-left text-body">Архив<span className="ml-auto text-white/45">{archiveCount}</span><ChevronRight size={18} className="ml-1 text-white/30" /></button>
     <div className="mt-4 space-y-2.5">
-      <button type="button" onClick={() => setPage("notifications")} className="flex h-[54px] w-full items-center rounded-[22px] bg-[#2c2c2e] px-4 text-left text-[17px]">Уведомления<span className="ml-auto text-white/45">{stateLabel(prefs.notifications)}</span><ChevronRight size={18} className="ml-1 text-white/30" /></button>
-      <button type="button" onClick={() => setPage("calendar")} className="flex h-[54px] w-full items-center rounded-[22px] bg-[#2c2c2e] px-4 text-left text-[17px]">Календарь<span className="ml-auto text-white/45">{stateLabel(prefs.calendar)}</span><ChevronRight size={18} className="ml-1 text-white/30" /></button>
-      <button type="button" onClick={() => setPage("email")} className="flex h-[54px] w-full items-center rounded-[22px] bg-[#2c2c2e] px-4 text-left text-[17px]">Письма<span className="ml-auto text-white/45">{stateLabel(prefs.emailUpdates)}</span><ChevronRight size={18} className="ml-1 text-white/30" /></button>
+      <button type="button" onClick={() => setPage("notifications")} className="flex h-[54px] w-full items-center rounded-[22px] bg-[#2c2c2e] px-4 text-left text-body">Уведомления<span className="ml-auto text-white/45">{stateLabel(prefs.notifications)}</span><ChevronRight size={18} className="ml-1 text-white/30" /></button>
+      <button type="button" onClick={() => setPage("calendar")} className="flex h-[54px] w-full items-center rounded-[22px] bg-[#2c2c2e] px-4 text-left text-body">Календарь<span className="ml-auto text-white/45">{stateLabel(prefs.calendar)}</span><ChevronRight size={18} className="ml-1 text-white/30" /></button>
+      <button type="button" onClick={() => setPage("email")} className="flex h-[54px] w-full items-center rounded-[22px] bg-[#2c2c2e] px-4 text-left text-body">Письма<span className="ml-auto text-white/45">{stateLabel(prefs.emailUpdates)}</span><ChevronRight size={18} className="ml-1 text-white/30" /></button>
     </div>
-    <p className="mb-2 ml-4 mt-6 text-[15px] text-white/50">Локации</p>
-    <button type="button" onClick={() => setPage("locations")} className="flex h-[54px] w-full items-center rounded-[22px] bg-[#2c2c2e] px-4 text-left text-[17px]">Заготовленные локации<span className="ml-auto text-white/45">{locationCount}</span><ChevronRight size={18} className="ml-1 text-white/30" /></button>
-    <p className="mb-2 ml-4 mt-6 text-[15px] text-white/50">Отправка</p>
-    <div className="rounded-[22px] bg-[#2c2c2e] px-4 py-3"><p className="text-[17px]">Отправлять с</p><p className="truncate text-[15px] text-white/45">{accountEmail}</p></div>
-    <p className="mt-2 px-4 text-[13px] leading-5 text-white/45">Этот адрес увидят люди, которым вы отправите приглашение.</p>
-    <p className="mb-2 ml-4 mt-6 text-[15px] text-white/50">Конфиденциальность</p>
+    <p className="mb-2 ml-4 mt-6 text-callout text-white/50">Локации</p>
+    <button type="button" onClick={() => setPage("locations")} className="flex h-[54px] w-full items-center rounded-[22px] bg-[#2c2c2e] px-4 text-left text-body">Заготовленные локации<span className="ml-auto text-white/45">{locationCount}</span><ChevronRight size={18} className="ml-1 text-white/30" /></button>
+    <p className="mb-2 ml-4 mt-6 text-callout text-white/50">Отправка</p>
+    <div className="rounded-[22px] bg-[#2c2c2e] px-4 py-3"><p className="text-body">Отправлять с</p><p className="truncate text-callout text-white/45">{accountEmail}</p></div>
+    <p className="mt-2 px-4 text-caption leading-5 text-white/45">Этот адрес увидят люди, которым вы отправите приглашение.</p>
+    <p className="mb-2 ml-4 mt-6 text-callout text-white/50">Конфиденциальность</p>
     <div className="overflow-hidden rounded-[22px] bg-[#2c2c2e]">
-      <button type="button" onClick={() => setPage("privacy")} className="flex h-[52px] w-full items-center px-4 text-left text-[17px]">Как используются данные<ChevronRight size={18} className="ml-auto text-white/30" /></button>
-      <button type="button" onClick={() => setPage("help")} className="flex h-[52px] w-full items-center border-t border-white/10 px-4 text-left text-[17px]">Помощь</button>
-      <button type="button" onClick={() => setPage("terms")} className="flex h-[52px] w-full items-center border-t border-white/10 px-4 text-left text-[17px]">Условия</button>
-      <button type="button" onClick={() => setScreen("auth")} className="flex h-[52px] w-full items-center border-t border-white/10 px-4 text-left text-[17px] text-[#ff453a]">Выйти</button>
+      <button type="button" onClick={() => setPage("privacy")} className="flex h-[52px] w-full items-center px-4 text-left text-body">Как используются данные<ChevronRight size={18} className="ml-auto text-white/30" /></button>
+      <button type="button" onClick={() => setPage("help")} className="flex h-[52px] w-full items-center border-t border-white/10 px-4 text-left text-body">Помощь</button>
+      <button type="button" onClick={() => setPage("terms")} className="flex h-[52px] w-full items-center border-t border-white/10 px-4 text-left text-body">Условия</button>
+      <button type="button" onClick={() => setScreen("auth")} className="flex h-[52px] w-full items-center border-t border-white/10 px-4 text-left text-body text-[#ff453a]">Выйти</button>
     </div>
   </div>;
 }
@@ -1670,7 +1671,7 @@ function PhoneSheet() {
     setPhone(value.trim());
     setScreen("hub");
   };
-  return <div><SheetHeader title="Номер телефона" done={false} /><p className="mt-2 px-1 text-[13px] leading-5 text-white/50">Номер сохранится в аккаунте. Код подтверждения появится, когда подключим отправку сообщений.</p><input value={value} onChange={(e) => setValue(e.target.value)} inputMode="tel" placeholder="+7 900 000-00-00" className="mt-4 h-14 w-full rounded-2xl bg-[#2c2c2e] px-4 text-[20px] outline-none placeholder:text-white/30" /><button onClick={submit} className="mt-4 h-[54px] w-full rounded-full bg-[#ff6b00] text-[17px] font-semibold">Продолжить</button></div>;
+  return <div><SheetHeader title="Номер телефона" done={false} /><p className="mt-2 px-1 text-caption leading-5 text-white/50">Номер сохранится в аккаунте. Код подтверждения появится, когда подключим отправку сообщений.</p><input value={value} onChange={(e) => setValue(e.target.value)} inputMode="tel" placeholder="+7 900 000-00-00" className="mt-4 h-14 w-full rounded-2xl bg-[#2c2c2e] px-4 text-body outline-none placeholder:text-white/30" /><button onClick={submit} className="mt-4 h-[54px] w-full rounded-full bg-[#ff6b00] text-body font-semibold">Продолжить</button></div>;
 }
 
 function Sheets() {
