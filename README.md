@@ -1,75 +1,75 @@
 # Amber
 
-**Команда в одном ритме** — приложение для координации event-команды в день мероприятия.
+**One team, one rhythm** — a real-time coordination app for event crews on show day.
 
-Организаторы собирают людей на площадке, участники видят статус коллег, расписание и карту — без чатов и звонков «где ты сейчас?».
+Organizers bring people to the venue; the team sees each other’s status, schedule, and map — without chat threads or “where are you?” calls.
 
-## Возможности
+## Features
 
-- **События** — создание ивента с датой, площадкой, обложкой и описанием
-- **Приглашения** — вход по коду или QR, роли на площадке
-- **Живая доска** — статусы команды: на площадке, в пути, готов, сбор
-- **Карта** — локация ивента и позиции участников (Mapbox)
-- **Расписание** — блоки по локациям и задачам, список или сетка
-- **Архив** — прошедшие события не засоряют доску
-- **PWA** — установка на телефон, тёмная и светлая тема
-- **Desktop + mobile** — отдельный интерфейс под широкий экран и под телефон
+- **Events** — create an event with date, venue, cover, and description
+- **Invites** — join by code or QR, with on-site roles
+- **Live board** — team statuses: on site, in transit, ready, gathering
+- **Map** — event location and member positions (Mapbox)
+- **Schedule** — blocks by location and task, list or grid view
+- **Archive** — past events stay off the active board
+- **PWA** — install on phone, light and dark themes
+- **Desktop + mobile** — separate UI for wide screens and phones
 
-## Стек
+## Stack
 
-| Слой | Технологии |
-|------|------------|
+| Layer | Tech |
+|------|------|
 | Framework | [Next.js](https://nextjs.org) 15, React 19, TypeScript |
 | UI | Tailwind CSS 4, Framer Motion, Vaul, Lucide |
-| Состояние | Zustand, Zod |
-| Карты | Mapbox GL |
+| State | Zustand, Zod |
+| Maps | Mapbox GL |
 
-Сейчас это клиентский прототип с демо-данными в store — без бэкенда и авторизации.
+This is currently a client-side prototype with demo data in the store — no backend or production auth yet.
 
-## Быстрый старт
+## Getting started
 
 ```bash
 npm install
 npm run dev
 ```
 
-Откройте [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000).
 
-### Карта Mapbox
+### Mapbox
 
-Для живой карты добавьте токен в `.env.local`:
+For the live map, add a token in `.env.local`:
 
 ```bash
 NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=pk.your_token_here
 ```
 
-Без токена приложение работает, карта показывает подсказку вместо тайлов.
+Without a token the app still runs; the map shows a hint instead of tiles.
 
-### Скрипты
+### Scripts
 
 ```bash
-npm run dev    # разработка
-npm run build  # production-сборка
-npm run start  # запуск собранного приложения
+npm run dev    # development
+npm run build  # production build
+npm run start  # run the production build
 npm run lint   # ESLint
 ```
 
-## Структура
+## Structure
 
 ```
 src/
   app/                 # Next.js App Router, layout, PWA manifest
   components/
-    EmbersApp.tsx      # мобильный UI
+    EmbersApp.tsx      # mobile UI
     desktop/           # desktop UI (hub, live, schedule, …)
-  store/               # Zustand: события, команда, расписание
-  notifications.ts     # браузерные уведомления
+  store/               # Zustand: events, team, schedule
+  notifications.ts     # browser notifications
 ```
 
-## Статус
+## Status
 
-Активная разработка UI и сценариев дня мероприятия. Backend, синхронизация в реальном времени и продакшен-авторизация — следующие шаги.
+Active UI work around the event-day flow. Backend, real-time sync, and production auth are next.
 
-## Лицензия
+## License
 
-Private — все права защищены.
+Private — all rights reserved.
