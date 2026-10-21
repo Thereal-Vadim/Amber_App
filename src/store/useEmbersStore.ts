@@ -5,7 +5,9 @@ import { z } from "zod";
 
 export type Status = "on_site" | "in_transit" | "ready" | "gathering";
 export type Screen = "auth" | "hub" | "create" | "live" | "schedule";
-export type Sheet = null | "join" | "member" | "status" | "datetime" | "location" | "invite" | "account" | "phone" | "files";
+export type Sheet = null | "join" | "member" | "status" | "datetime" | "location" | "invite" | "account" | "phone" | "files" | "archive" | "locations";
+export type ThemePreference = "system" | "light" | "dark";
+export type ScheduleView = "list" | "grid";
 
 export type Member = {
   id: string;
@@ -78,7 +80,7 @@ export type EventDetails = {
 
 export const demoEvent: EventDetails = {
   title: "Городское окно",
-  dateLabel: "Суббота, 18 октября",
+  dateLabel: "Суббота, 1 сентября",
   time: "08:00",
   endTime: "",
   allDay: false,
@@ -87,7 +89,7 @@ export const demoEvent: EventDetails = {
   timezone: "Москва",
   description: "",
   cover: "",
-  date: "2026-10-18",
+  date: "2029-09-01",
   lat: 55.8304,
   lng: 37.6326,
 };
@@ -129,6 +131,8 @@ export type EventRecord = {
   myStatus: Status;
   shareLocation: boolean;
   archivedAt: number | null;
+  /** Past events stay on the board after the user returns them from the archive. */
+  boardPinned?: boolean;
 };
 
 type Store = {
@@ -148,6 +152,12 @@ type Store = {
   scheduleOrigin: "live" | "invite";
   scheduleReturn: "live" | "create";
   accountPrefs: { notifications: boolean; notifyStatus: boolean; notifyShifts: boolean; notifyTeam: boolean; calendar: boolean; emailUpdates: boolean };
+  theme: ThemePreference;
+  scheduleView: ScheduleView;
+  setTheme: (theme: ThemePreference) => void;
+  setScheduleView: (view: ScheduleView) => void;
+  shelveDraft: () => void;
+  resumeCreate: () => void;
   setScreen: (screen: Screen) => void;
   openSheet: (sheet: Sheet, memberId?: string) => void;
   closeSheet: () => void;
@@ -334,8 +344,14 @@ function withFocus(state: FocusState, change: (event: EventRecord) => EventRecor
   return { events: state.events.map((event) => event.id === state.activeEventId ? change(event) : event) };
 }
 
+export function isOnBoard(event: EventRecord, now: number) {
+  if (event.archivedAt != null) return false;
+  if (event.boardPinned) return true;
+  return eventPhase(event.details, now) !== "past";
+}
+
 function onBoard(event: EventRecord, now: number) {
-  return event.archivedAt == null && eventPhase(event.details, now) !== "past";
+  return isOnBoard(event, now);
 }
 
 function boardNeighbor(events: EventRecord[], id: string, now: number) {
@@ -361,6 +377,15 @@ export const useEmbersStore = create<Store>((set) => ({
   scheduleOrigin: "invite",
   scheduleReturn: "create",
   accountPrefs: { notifications: false, notifyStatus: true, notifyShifts: true, notifyTeam: true, calendar: false, emailUpdates: false },
+  theme: "system",
+  scheduleView: "list",
+  setTheme: (theme) => set({ theme }),
+  setScheduleView: (scheduleView) => set({ scheduleView }),
+  shelveDraft: () => set((state) => state.draftEvent ? { screen: "hub", sheet: null, notice: "Черновик сохранён" } : { screen: "hub", sheet: null }),
+  resumeCreate: () => {
+    if (useEmbersStore.getState().draftEvent) set({ screen: "create", sheet: null });
+    else useEmbersStore.getState().startCreate();
+  },
   setScreen: (screen) => set((state) => ({
     screen,
     sheet: null,
@@ -375,7 +400,7 @@ export const useEmbersStore = create<Store>((set) => ({
     if (!current || current.archivedAt != null) return state;
     const next = state.activeEventId === id ? boardNeighbor(state.events, id, now) : undefined;
     return {
-      events: state.events.map((event) => event.id === id ? { ...event, archivedAt: now } : event),
+      events: state.events.map((event) => event.id === id ? { ...event, archivedAt: now, boardPinned: false } : event),
       ...(next ? { activeEventId: next } : {}),
       notice: "Событие в архиве",
     };
@@ -383,9 +408,10 @@ export const useEmbersStore = create<Store>((set) => ({
   restoreEvent: (id) => set((state) => {
     const now = Date.now();
     const current = state.events.find((event) => event.id === id);
-    if (!current || current.archivedAt == null || eventPhase(current.details, now) === "past") return state;
+    if (!current || isOnBoard(current, now)) return state;
+    const past = eventPhase(current.details, now) === "past";
     return {
-      events: state.events.map((event) => event.id === id ? { ...event, archivedAt: null } : event),
+      events: state.events.map((event) => event.id === id ? { ...event, archivedAt: null, boardPinned: past } : event),
       activeEventId: id,
       screen: "hub",
       sheet: null,

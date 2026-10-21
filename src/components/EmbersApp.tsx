@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import dynamic from "next/dynamic";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import jsQR from "jsqr";
 import { AnimatePresence, LayoutGroup, Reorder, animate, motion, useDragControls, useMotionValue, useTransform } from "framer-motion";
@@ -13,25 +14,25 @@ import {
   Sparkles, Star, Trash2, Users, Warehouse, X,
 } from "lucide-react";
 import {
-  type EventPhase, type EventRecord, type LocationIcon, type Member, type ProgramFile, type ScheduleBlock, type Sheet, type Status, archiveDaysLeft, blankDraft, eventPhase, eventPlace, eventWhen, eventWindow, focusedEvent, formatDateLabel, locationIconNames, presetColors, statusMeta, useEmbersStore,
+  type EventPhase, type EventRecord, type LocationIcon, type Member, type ProgramFile, type ScheduleBlock, type Sheet, type Status, archiveDaysLeft, blankDraft, eventPhase, eventPlace, eventWhen, eventWindow, focusedEvent, formatDateLabel, isOnBoard, locationIconNames, presetColors, statusMeta, useEmbersStore,
 } from "@/store/useEmbersStore";
 import type { Map as MapboxMap } from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { notificationPermission, requestNotificationPermission, showNotification } from "@/notifications";
 
-const spring = { type: "spring" as const, stiffness: 380, damping: 30, mass: 0.8 };
-const cn = (...v: Array<string | false | null | undefined>) => v.filter(Boolean).join(" ");
-const locationIconMap = { sparkles: Sparkles, mic: Mic, camera: Camera, users: Users, pin: MapPin, door: DoorOpen, box: Warehouse, lamp: Lamp, music: Music, coffee: Coffee, star: Star, flag: Flag };
-const locationIconLabel: Record<LocationIcon, string> = { sparkles: "Блёстки", mic: "Микрофон", camera: "Камера", users: "Люди", pin: "Метка", door: "Дверь", box: "Коробка", lamp: "Лампа", music: "Музыка", coffee: "Кофе", star: "Звезда", flag: "Флаг" };
-function LocationMark({ icon, color, size = 28 }: { icon?: string; color: string; size?: number }) {
+export const spring = { type: "spring" as const, stiffness: 380, damping: 30, mass: 0.8 };
+export const cn = (...v: Array<string | false | null | undefined>) => v.filter(Boolean).join(" ");
+export const locationIconMap = { sparkles: Sparkles, mic: Mic, camera: Camera, users: Users, pin: MapPin, door: DoorOpen, box: Warehouse, lamp: Lamp, music: Music, coffee: Coffee, star: Star, flag: Flag };
+export const locationIconLabel: Record<LocationIcon, string> = { sparkles: "Блёстки", mic: "Микрофон", camera: "Камера", users: "Люди", pin: "Метка", door: "Дверь", box: "Коробка", lamp: "Лампа", music: "Музыка", coffee: "Кофе", star: "Звезда", flag: "Флаг" };
+export function LocationMark({ icon, color, size = 28 }: { icon?: string; color: string; size?: number }) {
   const Icon = locationIconMap[icon as LocationIcon] ?? Sparkles;
   return <span style={{ background: color, width: size, height: size, borderRadius: size >= 48 ? 16 : 8 }} className="grid shrink-0 place-items-center text-white"><Icon size={Math.round(size * 0.46)} /></span>;
 }
-const timezones = ["Москва", "Калининград", "Самара", "Екатеринбург", "Новосибирск", "Владивосток"];
+export const timezones = ["Москва", "Калининград", "Самара", "Екатеринбург", "Новосибирск", "Владивосток"];
 const emptyBlocks: ScheduleBlock[] = [];
 const emptyFiles: ProgramFile[] = [];
 
-async function shareInvite(title: string, code: string) {
+export async function shareInvite(title: string, code: string) {
   const url = `https://amber.app/j/${code}`;
   if (navigator.share) {
     try {
@@ -49,7 +50,7 @@ async function shareInvite(title: string, code: string) {
   }
 }
 
-function shareResult(result: "shared" | "copied" | "cancelled" | "failed") {
+export function shareResult(result: "shared" | "copied" | "cancelled" | "failed") {
   if (result === "copied") useEmbersStore.getState().setNotice("Ссылка скопирована");
   if (result === "failed") useEmbersStore.getState().setNotice("Не удалось поделиться");
 }
@@ -61,7 +62,7 @@ function formatAway(minutes: number) {
   return rest ? `через ${hours} ч ${rest} мин` : `через ${hours} ч`;
 }
 
-function useClock() {
+export function useClock() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -77,7 +78,7 @@ type SpeechRecognitionLike = {
   onerror: (() => void) | null;
 };
 
-function startDictation(onText: (text: string) => void) {
+export function startDictation(onText: (text: string) => void) {
   const host = window as Window & {
     SpeechRecognition?: new () => SpeechRecognitionLike;
     webkitSpeechRecognition?: new () => SpeechRecognitionLike;
@@ -92,7 +93,7 @@ function startDictation(onText: (text: string) => void) {
   return true;
 }
 
-function FrameNotice() {
+export function FrameNotice() {
   const notice = useEmbersStore((s) => s.notice);
   const setNotice = useEmbersStore((s) => s.setNotice);
   useEffect(() => {
@@ -115,7 +116,7 @@ function Asset({ src, className = "h-5 w-5" }: { src: string; className?: string
 }
 
 function Avatar({ member, size = 44 }: { member: Member; size?: number }) {
-  return <span style={{ width: size, height: size, background: member.color }} className="grid shrink-0 place-items-center rounded-full border-2 border-white text-callout font-semibold shadow-sm">{member.initials}</span>;
+  return <span style={{ width: size, height: size, background: member.color }} className="on-fill grid shrink-0 place-items-center rounded-full border-2 border-white text-callout font-semibold text-white shadow-sm">{member.initials}</span>;
 }
 
 function StatusPill({ status }: { status: Status }) {
@@ -130,7 +131,7 @@ function CircleButton({ children, onClick, light = false, label, className }: { 
 function AuthScreen() {
   const setScreen = useEmbersStore((s) => s.setScreen);
   const open = useEmbersStore((s) => s.openSheet);
-  return <div className="figma-gradient flex h-full min-h-0 flex-col overflow-hidden px-5 pt-[max(16px,env(safe-area-inset-top))] text-center" data-node-id="2:3">
+  return <div className="figma-gradient on-dark flex h-full min-h-0 flex-col overflow-hidden px-5 pt-[max(16px,env(safe-area-inset-top))] text-center" data-node-id="2:3">
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-4">
       <div className="grid h-24 w-24 shrink-0 place-items-center rounded-[28px] border border-white/35 bg-white/15">
         <Asset src="/figma-flame.svg" className="h-12 w-12" />
@@ -147,12 +148,12 @@ function AuthScreen() {
   </div>;
 }
 
-function useBoardEvents() {
+export function useBoardEvents() {
   const events = useEmbersStore((s) => s.events);
   const now = useClock();
   const time = now.getTime();
   return events
-    .filter((event) => event.archivedAt == null && eventPhase(event.details, time) !== "past")
+    .filter((event) => isOnBoard(event, time))
     .sort((left, right) => {
       const live = Number(eventPhase(right.details, time) === "live") - Number(eventPhase(left.details, time) === "live");
       if (live) return live;
@@ -217,7 +218,7 @@ function rubberShift(value: number, min: number, max: number, size: number) {
   return value;
 }
 
-function ruDays(count: number) {
+export function ruDays(count: number) {
   const mod10 = count % 10;
   const mod100 = count % 100;
   const word = mod10 === 1 && mod100 !== 11 ? "день" : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? "дня" : "дней";
@@ -235,7 +236,7 @@ function EventCard({ record, onOpen }: { record: EventRecord; onOpen: () => void
   const now = useClock();
   const event = record.details;
   const team = record.team;
-  return <motion.button type="button" onClick={onOpen} whileTap={{ scale: .98 }} transition={spring} className="relative h-full w-full overflow-hidden rounded-[36px] bg-gradient-to-b from-[#ff8a1f] via-[#d2321c] via-45% to-[#3b0b22] text-center shadow-2xl">
+  return <motion.button type="button" onClick={onOpen} whileTap={{ scale: .98 }} transition={spring} className="on-dark relative h-full w-full overflow-hidden rounded-[36px] bg-gradient-to-b from-[#ff8a1f] via-[#d2321c] via-45% to-[#3b0b22] text-center text-white shadow-2xl">
     {event.cover && <span className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${event.cover})` }} />}
     <div className="absolute -left-16 top-10 h-[300px] w-[300px] rounded-full bg-[radial-gradient(circle_at_35%_30%,#ffd18b_0%,#ff7a1c_35%,transparent_68%)] opacity-90 blur-sm" />
     <div className="absolute inset-x-0 bottom-0 h-80 bg-gradient-to-b from-transparent to-black/55" />
@@ -555,7 +556,7 @@ function CreateEvent() {
   useEffect(() => { if (draft.venue) setShowMap(true); }, [draft.venue]);
   return <div className="relative h-full">
     <div className="no-scrollbar h-full overflow-y-auto">
-    <div className="figma-gradient relative min-h-full pb-[max(32px,env(safe-area-inset-bottom))]" data-node-id="2:347">
+    <div className="figma-gradient on-dark relative min-h-full pb-[max(32px,env(safe-area-inset-bottom))]" data-node-id="2:347">
     <div className="flex h-[28rem] flex-col items-center px-5 pt-[calc(84px+var(--chrome-shift))]">
       <input ref={coverRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) updateDraft({ cover: URL.createObjectURL(file) }); }} />
       <div className="flex flex-1 items-center">
@@ -594,7 +595,7 @@ function CreateEvent() {
   </div>;
 }
 
-function minutesOf(value: string) {
+export function minutesOf(value: string) {
   const match = /^(\d{2}):(\d{2})$/.exec(value);
   if (!match) return null;
   const hours = Number(match[1]);
@@ -603,11 +604,11 @@ function minutesOf(value: string) {
   return hours * 60 + minutes;
 }
 
-function clockLabel(minutes: number) {
+export function clockLabel(minutes: number) {
   return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
 }
 
-function scheduleRanges(schedules: Record<string, ScheduleBlock[]>, memberIds: readonly string[]) {
+export function scheduleRanges(schedules: Record<string, ScheduleBlock[]>, memberIds: readonly string[]) {
   return memberIds.flatMap((id) => schedules[id] ?? []).flatMap((block) => {
     const { start, end } = splitRange(block.time);
     const from = minutesOf(start);
@@ -748,12 +749,12 @@ function Timeline() {
   };
   const dayWidth = viewport > 0 ? (viewport / 6) * 24 : 0;
   return <div className="rounded-[28px] bg-white/10 p-5">
-    {scrub === null ? <button type="button" onClick={() => alignLiveToStart()} className="text-[#ff6b00]" style={liveCueStyle}>сейчас</button> : <button type="button" onClick={() => alignLiveToStart(scrub)} className="text-[#ff6b00]" style={liveCueStyle}>вернуться к live</button>}
+    {scrub === null ? <button type="button" onClick={() => alignLiveToStart()} className="text-white/90" style={liveCueStyle}>сейчас</button> : <button type="button" onClick={() => alignLiveToStart(scrub)} className="text-white/90" style={liveCueStyle}>вернуться к live</button>}
     <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4">
       <p className="text-display font-bold leading-[58px] tracking-[-0.04em] tabular">{label}</p>
       <div className="text-right text-callout font-semibold leading-[18px]">
         <p className="truncate">{moment ? moment.title : "Нет расписания"}</p>
-        <p className="mt-0.5 truncate text-[#ff6b00]">{detail}</p>
+        <p className="mt-0.5 truncate text-white/75">{detail}</p>
       </div>
     </div>
     {timeline && <div ref={scrollerRef} className="no-scrollbar mt-5 overflow-x-auto overflow-y-hidden">
@@ -828,19 +829,19 @@ function memberPoint(member: Member, lat: number, lng: number): [number, number]
   return [lng + (member.coords.x / 100 - 0.5) * span, lat - (member.coords.y / 100 - 0.5) * span * 0.7];
 }
 
-function metersBetween(a: GeoPoint, b: GeoPoint) {
+export function metersBetween(a: GeoPoint, b: GeoPoint) {
   const dLat = (a.lat - b.lat) * 111320;
   const dLng = (a.lng - b.lng) * 111320 * Math.cos(((a.lat + b.lat) / 2) * Math.PI / 180);
   return Math.hypot(dLat, dLng);
 }
 
-function formatDistance(meters: number) {
+export function formatDistance(meters: number) {
   if (meters < 1000) return `${Math.max(10, Math.round(meters / 10) * 10)} м`;
   const digits = meters < 10000 ? 1 : 0;
   return `${(meters / 1000).toFixed(digits).replace(".", ",")} км`;
 }
 
-function useMyLocation() {
+export function useMyLocation() {
   const [point, setPoint] = useState<GeoPoint | null>(null);
   const [status, setStatus] = useState<"pending" | "granted" | "denied" | "unavailable">("pending");
   const setNotice = useEmbersStore((s) => s.setNotice);
@@ -867,7 +868,7 @@ function useMyLocation() {
   return { point, status };
 }
 
-function TrackingMap({ lat, lng, address, members, user, expanded, onMember }: { lat: number; lng: number; address: string; members: Member[]; user: GeoPoint | null; expanded: boolean; onMember: (id: string) => void }) {
+export function TrackingMap({ lat, lng, address, members, user, expanded, onMember }: { lat: number; lng: number; address: string; members: Member[]; user: GeoPoint | null; expanded: boolean; onMember: (id: string) => void }) {
   const nodeRef = useRef<HTMLDivElement>(null);
   const onMemberRef = useRef(onMember);
   const membersRef = useRef(members);
@@ -1057,6 +1058,41 @@ function MemberRow({ member, role, revealed, onReveal, onClose }: { member: Memb
   </div>;
 }
 
+function TodaySchedule() {
+  const record = useEmbersStore(focusedEvent);
+  const openSchedule = useEmbersStore((s) => s.openSchedule);
+  const [scope, setScope] = useState<"all" | "me">("all");
+  const people = scope === "me"
+    ? [{ id: "vadim", name: "Вадим Филатов" }]
+    : [{ id: "vadim", name: "Вадим Филатов" }, ...record.team.map((member) => ({ id: member.id, name: member.name }))];
+  const groups = people
+    .map((person) => ({ ...person, blocks: record.schedules[person.id] ?? [] }))
+    .filter((person) => scope === "me" || person.blocks.length > 0);
+  const editId = scope === "me" ? "vadim" : groups[0]?.id ?? "vadim";
+  return <section>
+    <div className="flex items-center gap-3">
+      <h2 className="min-w-0 flex-1 text-body font-bold">Расписание на сегодня</h2>
+      <button type="button" onClick={() => openSchedule(editId, "live")} className="shrink-0 text-callout font-semibold text-[#0A84FF]">Изменить</button>
+    </div>
+    <div className="mt-3 flex gap-2">
+      {([["all", "Для всех"], ["me", "Только для меня"]] as const).map(([id, label]) => <button key={id} type="button" onClick={() => setScope(id)} className={cn("h-9 rounded-full px-3.5 text-caption font-semibold", scope === id ? "bg-white text-black" : "bg-white/10")}>{label}</button>)}
+    </div>
+    <div className="mt-3 flex flex-col gap-2">
+      {groups.every((person) => person.blocks.length === 0) && <p className="rounded-[22px] bg-white/10 px-4 py-4 text-callout text-white/55">{scope === "me" ? "У вас пока нет блоков на сегодня" : "На сегодня ничего не запланировано"}</p>}
+      {groups.map((person) => person.blocks.length > 0 && <div key={person.id} className="flex flex-col gap-2">
+        {scope === "all" && <p className="px-1 text-caption text-white/45">{person.name}</p>}
+        {person.blocks.map((block) => <div key={block.id} className="flex items-stretch gap-3 rounded-[22px] bg-white px-3.5 py-3 text-[#1c1c1e] shadow-[0_8px_24px_rgba(0,0,0,.12)]">
+          <i className="w-1 shrink-0 rounded-full" style={{ background: block.color }} />
+          <span className="min-w-0">
+            <b className="block truncate text-callout font-semibold">{block.location} · {block.time}</b>
+            <small className="mt-0.5 block truncate text-caption font-normal text-[#8e8e93]">{block.task}</small>
+          </span>
+        </div>)}
+      </div>)}
+    </div>
+  </section>;
+}
+
 function TeamList() {
   const filter = useEmbersStore((s) => s.teamFilter);
   const setFilter = useEmbersStore((s) => s.filterTeam);
@@ -1083,16 +1119,15 @@ function LiveBoard() {
   const record = useEmbersStore(focusedEvent);
   const myStatus = record.myStatus;
   const event = record.details;
-  return <div className="relative bg-black" data-node-id="2:598">
-    <div className="relative flex min-h-[100cqh] flex-col justify-end gap-5 px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-[calc(96px+var(--chrome-shift))]">
-      <div className="figma-gradient pointer-events-none absolute inset-0" />
+  return <div className="figma-gradient on-dark relative min-h-full" data-node-id="2:598">
+    <div className="relative flex min-h-[100cqh] flex-col justify-end gap-5 px-5 pb-5 pt-[calc(96px+var(--chrome-shift))]">
       <div className="absolute left-5 top-(--chrome-top) z-30"><CircleButton onClick={() => setScreen("hub")} label="Назад"><Asset src="/figma-back.svg" /></CircleButton></div>
       <div className="absolute right-5 top-(--chrome-top) z-30 flex gap-2"><CircleButton label="Поделиться" onClick={() => { void shareInvite(event.title, record.code).then(shareResult); }}><Asset src="/figma-share.svg" /></CircleButton><button onClick={() => open("account")} aria-label="Аккаунт" className="grid h-11 w-11 place-items-center rounded-full bg-[#9c613d] text-callout font-semibold">ВФ</button></div>
       <div className="relative z-0 text-center"><h1 className="text-title font-extrabold tracking-tight">{event.title}</h1><p className="mt-2 text-caption text-white/85">{event.dateLabel} · {event.venue}</p></div>
       <div className="relative z-0"><Timeline /></div>
       <div className="relative z-0 flex h-[52px] items-center gap-5 rounded-[22px] bg-white/10 px-5"><span className="grid h-9 w-9 place-items-center rounded-full" style={{ background: `${statusMeta[myStatus].color}33` }}><MapPin size={18} style={{ color: statusMeta[myStatus].color }} /></span><div className="min-w-0 flex-1"><p className="text-caption text-white/45">Мой статус</p><p className="text-caption font-semibold">{statusMeta[myStatus].label}</p></div><button onClick={() => open("status")} className="h-9 rounded-full bg-[#ff6b00] px-4 text-caption font-semibold">Сменить</button></div>
     </div>
-    <div className="relative z-0 flex flex-col gap-5 px-5 pb-[max(20px,env(safe-area-inset-bottom))]"><MapCard /><TeamList /></div>
+    <div className="relative z-0 flex flex-col gap-5 px-5 pb-[max(20px,env(safe-area-inset-bottom))]"><MapCard /><TodaySchedule /><TeamList /></div>
   </div>;
 }
 
@@ -1101,7 +1136,7 @@ function SheetHeader({ title, done = true, closeButton = true }: { title: string
   return <div className="relative flex h-[58px] items-center justify-center">{closeButton && <CircleButton onClick={close}><X size={20} /></CircleButton>}<h2 className="absolute inset-x-16 text-center text-body font-semibold">{title}</h2>{done && <div className="ml-auto"><CircleButton onClick={close} light><Check size={20} /></CircleButton></div>}</div>;
 }
 
-function QrScanner({ onCode }: { onCode: (code: string) => void }) {
+export function QrScanner({ onCode }: { onCode: (code: string) => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const setNotice = useEmbersStore((s) => s.setNotice);
   useEffect(() => {
@@ -1192,8 +1227,8 @@ function DateSheet() {
   return <div data-node-id="2:407"><SheetHeader title="Дата и время" /><div className="mt-2 overflow-hidden rounded-[20px] bg-[#2c2c2e]"><button onClick={toggleAllDay} className="flex h-[52px] w-full items-center px-4 text-body">Весь день<span className={cn("ml-auto h-[31px] w-[51px] rounded-full p-0.5", draft.allDay ? "bg-[#34c759]" : "bg-[#39393d]")}><i className={cn("block h-[27px] w-[27px] rounded-full bg-white transition-transform", draft.allDay && "translate-x-5")} /></span></button><div className="flex h-[52px] items-center border-t border-white/15 px-4 text-body">Дата<input type="date" value={draft.date} onChange={(e) => setDate(e.target.value)} className="ml-auto rounded-lg bg-white/10 px-2.5 py-1.5 outline-none [color-scheme:dark]" /></div>{!draft.allDay && <div className="flex h-[52px] items-center border-t border-white/15 px-4 text-body">Начало<input type="time" value={draft.time} onChange={(e) => e.target.value && updateDraft({ time: e.target.value })} className="ml-auto rounded-lg bg-white/10 px-2.5 py-1.5 tabular outline-none [color-scheme:dark]" /></div>}<div className="flex h-[52px] items-center border-t border-white/15 px-4 text-body">{draft.endTime ? <>Окончание<input type="time" value={draft.endTime} onChange={(e) => updateDraft({ endTime: e.target.value })} className="ml-auto rounded-lg bg-white/10 px-2.5 py-1.5 tabular outline-none [color-scheme:dark]" /><button onClick={() => updateDraft({ endTime: "" })} className="ml-3 text-callout text-white/50">Убрать</button></> : <button onClick={() => updateDraft({ endTime: "23:00" })} className="w-full text-left">Добавить время окончания</button>}</div></div><button onClick={() => setZonesOpen((value) => !value)} className="mt-4 flex h-[52px] w-full items-center rounded-[20px] bg-[#2c2c2e] px-4 text-body">Часовой пояс<span className="ml-auto text-white/50">{draft.timezone}</span><ChevronRight size={18} className={cn("ml-2 text-white/40", zonesOpen && "rotate-90")} /></button>{zonesOpen && <div className="mt-2 overflow-hidden rounded-[20px] bg-[#2c2c2e]">{timezones.map((zone) => <button key={zone} onClick={() => { updateDraft({ timezone: zone }); setZonesOpen(false); }} className="flex h-12 w-full items-center border-t border-white/10 px-4 text-left first:border-t-0">{zone}{draft.timezone === zone && <Check size={16} className="ml-auto text-[#ff6b00]" />}</button>)}</div>}<p className="mt-3 px-4 text-caption leading-4 text-white/50">Время начала увидит вся команда. Тайминг программы<br />подстроится под эту дату автоматически.</p></div>;
 }
 
-type MapPlace = { id: string; name: string; address: string; lat: number; lng: number };
-const knownPlaces: MapPlace[] = [
+export type MapPlace = { id: string; name: string; address: string; lat: number; lng: number };
+export const knownPlaces: MapPlace[] = [
   { id: "vdnh", name: "ВДНХ, павильон 57", address: "Проспект Мира, 119с57", lat: 55.8304, lng: 37.6326 },
   { id: "gorky", name: "Парк Горького", address: "Крымский Вал, 9", lat: 55.7312, lng: 37.6034 },
   { id: "mosfilm", name: "Мосфильм, павильон 3", address: "Мосфильмовская ул., 1", lat: 55.7234, lng: 37.529 },
@@ -1258,7 +1293,7 @@ function LocationSheet() {
   </div>;
 }
 
-const roleSuggestions = ["Свет", "Звук", "Видео", "Фото", "Продюсер", "Площадка", "Техник"];
+export const roleSuggestions = ["Свет", "Звук", "Видео", "Фото", "Продюсер", "Площадка", "Техник"];
 
 function InviteSheet() {
   const record = useEmbersStore(focusedEvent);
@@ -1362,7 +1397,7 @@ function RoleChip({ role, onSave }: { role: string; onSave: (role: string) => vo
   </button>;
 }
 
-function splitRange(time: string) {
+export function splitRange(time: string) {
   const [start = "18:00", end = "19:30"] = time.split(/\s*[–—-]\s*/);
   return { start: /^\d{2}:\d{2}$/.test(start) ? start : "18:00", end: /^\d{2}:\d{2}$/.test(end) ? end : "19:30" };
 }
@@ -1610,7 +1645,7 @@ function FilesSheet() {
   </div>;
 }
 
-const accountEmail = "troble.gaming2001@icloud.com";
+export const accountEmail = "troble.gaming2001@icloud.com";
 
 function SettingsSwitch({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return <button type="button" role="switch" aria-checked={on} onClick={onToggle} className={cn("h-[31px] w-[51px] rounded-full p-0.5", on ? "bg-[#34c759]" : "bg-[#39393d]")}><i className={cn("block h-[27px] w-[27px] rounded-full bg-white transition-transform", on && "translate-x-5")} /></button>;
@@ -1795,16 +1830,16 @@ function ArchivePage({ onBack }: { onBack: () => void }) {
   const restoreEvent = useEmbersStore((s) => s.restoreEvent);
   const now = useClock();
   const time = now.getTime();
-  const archived = events.filter((event) => event.archivedAt != null || eventPhase(event.details, time) === "past");
+  const archived = events.filter((event) => !isOnBoard(event, time));
   return <div>
     <div className="relative flex h-11 items-center"><button type="button" onClick={onBack} className="flex items-center text-body text-[#0A84FF]"><ChevronLeft size={22} />Настройки</button><h2 className="absolute inset-x-24 text-center text-body font-semibold">Архив</h2></div>
-    <p className="mt-3 px-1 text-caption leading-5 text-white/45">События в архиве хранятся 7 дней, затем архив очищается. Текущие можно вернуть на доску.</p>
+    <p className="mt-3 px-1 text-caption leading-5 text-white/45">События в архиве хранятся 7 дней, затем архив очищается. Любое из них можно вернуть на доску.</p>
     {!archived.length && <p className="mt-8 text-center text-callout text-white/45">Архив пуст</p>}
     <div className="mt-4 space-y-2.5">{archived.map((event) => {
       const phase = eventPhase(event.details, time);
       const days = archiveDaysLeft(event.details, time, event.archivedAt);
       const left = days <= 0 ? "Удалится сегодня" : `Ещё ${ruDays(days)}`;
-      const canRestore = event.archivedAt != null && phase !== "past";
+      const canRestore = !isOnBoard(event, time);
       return <div key={event.id} className="flex items-center gap-3 rounded-[22px] bg-[#2c2c2e] px-4 py-3">
         <button type="button" onClick={() => { selectEvent(event.id); setScreen("live"); }} className="flex min-w-0 flex-1 items-center gap-3 text-left">
           <span className="min-w-0 flex-1"><b className="block truncate text-body font-semibold">{event.details.title || "Без названия"}</b><small className="mt-0.5 block truncate text-caption text-white/45">{eventWhen(event.details)}</small><small className="mt-0.5 block text-caption text-white/45">{left}</small></span>
@@ -1824,7 +1859,7 @@ function AccountSheet() {
   const locationCount = useEmbersStore((s) => focusedEvent(s).locationGroups.reduce((sum, group) => sum + group.locations.length, 0));
   const now = useClock();
   const events = useEmbersStore((s) => s.events);
-  const archiveCount = events.filter((event) => event.archivedAt != null || eventPhase(event.details, now.getTime()) === "past").length;
+  const archiveCount = events.filter((event) => !isOnBoard(event, now.getTime())).length;
   const [page, setPage] = useState<"root" | "notifications" | "calendar" | "email" | "privacy" | "help" | "terms" | "locations" | "archive">("root");
   const pages = {
     calendar: { title: "Календарь", key: "calendar" as const, text: "Событие появится в календаре телефона, когда синхронизация будет подключена." },
@@ -1918,7 +1953,7 @@ function shiftStart(time: string) {
   return Number(match[1]) * 60 + Number(match[2]);
 }
 
-function NotificationBridge() {
+export function NotificationBridge() {
   const enabled = useEmbersStore((s) => s.accountPrefs.notifications);
   const notifyStatus = useEmbersStore((s) => s.accountPrefs.notifyStatus);
   const notifyTeam = useEmbersStore((s) => s.accountPrefs.notifyTeam);
@@ -1985,30 +2020,91 @@ function Sheets() {
   const sheet = useEmbersStore((s) => s.sheet);
   const close = useEmbersStore((s) => s.closeSheet);
   const content: Partial<Record<Exclude<Sheet,null>,React.ReactNode>> = {join:<JoinSheet/>,datetime:<DateSheet/>,location:<LocationSheet/>,invite:<InviteSheet/>,member:<MemberSheet/>,status:<StatusSheet/>,account:<AccountSheet/>,phone:<PhoneSheet/>,files:<FilesSheet/>};
-  const tall = ["join","location","invite","files","account"].includes(sheet ?? "");
-  const heights: Record<string,string> = {datetime:"h-[560px]",status:"h-[552px]",member:"h-[702px]",account:"h-[420px]",phone:"h-[380px]"};
-  return <Drawer.Root open={sheet!==null} onOpenChange={(v)=>!v&&close()} shouldScaleBackground><Drawer.Portal><Drawer.Overlay className="fixed inset-0 z-[150] bg-black/50" /><Drawer.Content className={cn("fixed inset-x-0 bottom-0 z-[160] mx-auto w-full max-w-none overflow-y-auto rounded-t-[38px] bg-[#1c1c1e] px-4 pb-[max(32px,env(safe-area-inset-bottom))] outline-none min-[520px]:max-w-[393px]",tall?"h-[calc(100dvh-56px)] max-h-[836px]":heights[sheet??""]??"h-[70dvh]")}><Drawer.Title className="sr-only">{sheet}</Drawer.Title><i className="sticky top-1.5 z-20 mx-auto block h-[5px] w-[37px] rounded bg-[#7f7f7f80]" />{sheet === "account" ? <div className="pt-10">{content.account}</div> : sheet && content[sheet]}</Drawer.Content></Drawer.Portal></Drawer.Root>;
+  const tall = ["join", "location", "invite", "files", "account"].includes(sheet ?? "");
+  // Leave room above the sheet so the title and close button stay inside the safe area.
+  const fit = "calc(100dvh - max(56px, env(safe-area-inset-top) + 12px))";
+  const heights: Record<string, string> = {
+    datetime: "h-[min(560px,calc(100dvh-max(56px,env(safe-area-inset-top)+12px)))]",
+    status: "h-[min(552px,calc(100dvh-max(56px,env(safe-area-inset-top)+12px)))]",
+    member: "h-[min(702px,calc(100dvh-max(56px,env(safe-area-inset-top)+12px)))]",
+    phone: "h-[min(380px,calc(100dvh-max(56px,env(safe-area-inset-top)+12px)))]",
+  };
+  return <Drawer.Root open={sheet !== null} onOpenChange={(v) => !v && close()} shouldScaleBackground>
+    <Drawer.Portal>
+      <Drawer.Overlay className="fixed inset-0 z-[150] bg-black/50" />
+      <Drawer.Content
+        data-mobile-sheet
+        style={tall ? { height: `min(836px, ${fit})` } : undefined}
+        className={cn(
+          "fixed inset-x-0 bottom-0 z-[160] mx-auto flex w-full max-w-none flex-col overflow-hidden rounded-t-[38px] bg-[#1c1c1e] outline-none min-[520px]:max-w-[393px]",
+          !tall && (heights[sheet ?? ""] ?? "max-h-[70dvh]"),
+        )}
+      >
+        <Drawer.Title className="sr-only">{sheet}</Drawer.Title>
+        <i className="mx-auto mt-2 h-[5px] w-[37px] shrink-0 rounded bg-[#7f7f7f80]" />
+        <div
+          data-vaul-no-drag
+          className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-4 pb-[max(48px,calc(env(safe-area-inset-bottom)+28px))] pt-3"
+        >
+          {sheet && content[sheet]}
+        </div>
+      </Drawer.Content>
+    </Drawer.Portal>
+  </Drawer.Root>;
 }
 
-function ArchiveSweep() {
+export function ArchiveSweep() {
   const pruneArchive = useEmbersStore((s) => s.pruneArchive);
   const now = useClock();
   useEffect(() => { pruneArchive(now.getTime()); }, [now, pruneArchive]);
   return null;
 }
 
-function useStatusBar(screen: string) {
+function usePhoneTheme(screen: string) {
   useEffect(() => {
-    const color = screen === "auth" || screen === "create" || screen === "live" ? "#ff6b00" : "#000000";
-    document.documentElement.style.backgroundColor = color;
-    document.body.style.backgroundColor = color;
-    document.querySelectorAll('meta[name="theme-color"]').forEach((node) => node.setAttribute("content", color));
+    const query = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => {
+      const dark = query.matches;
+      document.documentElement.dataset.appearance = dark ? "dark" : "light";
+      document.documentElement.style.colorScheme = dark ? "dark" : "light";
+      const color = screen === "auth" || screen === "create" || screen === "live" ? "#ff6b00" : dark ? "#000000" : "#f2f2f7";
+      document.documentElement.style.backgroundColor = color;
+      document.body.style.backgroundColor = color;
+      document.querySelectorAll('meta[name="theme-color"]').forEach((node) => node.setAttribute("content", color));
+    };
+    apply();
+    query.addEventListener("change", apply);
+    return () => {
+      query.removeEventListener("change", apply);
+      delete document.documentElement.dataset.appearance;
+    };
   }, [screen]);
 }
 
+const DesktopApp = dynamic(() => import("./desktop/DesktopApp"), { ssr: false });
+const desktopQuery = "(min-width: 1024px)";
+
+function useDesktop() {
+  return useSyncExternalStore(
+    (notify) => {
+      const query = window.matchMedia(desktopQuery);
+      query.addEventListener("change", notify);
+      return () => query.removeEventListener("change", notify);
+    },
+    () => window.matchMedia(desktopQuery).matches,
+    () => false,
+  );
+}
+
 export default function EmbersApp() {
+  const desktop = useDesktop();
+  if (desktop) return <DesktopApp />;
+  return <MobileApp />;
+}
+
+function MobileApp() {
   const screen = useEmbersStore((s) => s.screen);
-  useStatusBar(screen);
+  usePhoneTheme(screen);
   const views = {auth:<AuthScreen/>,hub:<EventsHub/>,create:<CreateEvent/>,live:<LiveBoard/>,schedule:<ScheduleScreen/>};
   return <main className="grid h-dvh place-items-center overflow-hidden bg-black">
     <ArchiveSweep />

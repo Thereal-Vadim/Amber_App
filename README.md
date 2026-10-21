@@ -1,36 +1,75 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Amber
 
-## Getting Started
+**Команда в одном ритме** — приложение для координации event-команды в день мероприятия.
 
-First, run the development server:
+Организаторы собирают людей на площадке, участники видят статус коллег, расписание и карту — без чатов и звонков «где ты сейчас?».
+
+## Возможности
+
+- **События** — создание ивента с датой, площадкой, обложкой и описанием
+- **Приглашения** — вход по коду или QR, роли на площадке
+- **Живая доска** — статусы команды: на площадке, в пути, готов, сбор
+- **Карта** — локация ивента и позиции участников (Mapbox)
+- **Расписание** — блоки по локациям и задачам, список или сетка
+- **Архив** — прошедшие события не засоряют доску
+- **PWA** — установка на телефон, тёмная и светлая тема
+- **Desktop + mobile** — отдельный интерфейс под широкий экран и под телефон
+
+## Стек
+
+| Слой | Технологии |
+|------|------------|
+| Framework | [Next.js](https://nextjs.org) 15, React 19, TypeScript |
+| UI | Tailwind CSS 4, Framer Motion, Vaul, Lucide |
+| Состояние | Zustand, Zod |
+| Карты | Mapbox GL |
+
+Сейчас это клиентский прототип с демо-данными в store — без бэкенда и авторизации.
+
+## Быстрый старт
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Откройте [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Карта Mapbox
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Для живой карты добавьте токен в `.env.local`:
 
-## Learn More
+```bash
+NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=pk.your_token_here
+```
 
-To learn more about Next.js, take a look at the following resources:
+Без токена приложение работает, карта показывает подсказку вместо тайлов.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Скрипты
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run dev    # разработка
+npm run build  # production-сборка
+npm run start  # запуск собранного приложения
+npm run lint   # ESLint
+```
 
-## Deploy on Vercel
+## Структура
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+src/
+  app/                 # Next.js App Router, layout, PWA manifest
+  components/
+    EmbersApp.tsx      # мобильный UI
+    desktop/           # desktop UI (hub, live, schedule, …)
+  store/               # Zustand: события, команда, расписание
+  notifications.ts     # браузерные уведомления
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Статус
+
+Активная разработка UI и сценариев дня мероприятия. Backend, синхронизация в реальном времени и продакшен-авторизация — следующие шаги.
+
+## Лицензия
+
+Private — все права защищены.
