@@ -5,7 +5,8 @@ import { Reorder, useDragControls } from "framer-motion";
 import { ArrowDown, Clock3, GripVertical, MoreVertical, Plus } from "lucide-react";
 import { type ScheduleBlock, focusedEvent, useEmbersStore } from "@/store/useEmbersStore";
 import { LocationMark, clockLabel, cn, minutesOf, spring, splitRange, useClock } from "../EmbersApp";
-import { Avatar, Button, Panel, SectionLabel, Segmented, organizer } from "./ui";
+import { eventPeople } from "@/store/useEmbersStore";
+import { Avatar, Button, Panel, SectionLabel, Segmented, useOrganizer } from "./ui";
 import { Menu } from "./live";
 import { PageHeader } from "./hub";
 
@@ -22,8 +23,9 @@ function blockWord(count: number) {
 function useScheduleContext() {
   const record = useEmbersStore(focusedEvent);
   const memberId = useEmbersStore((s) => s.selectedMemberId);
-  const people = record.team.length ? record.team : [{ id: "vadim", ...organizer, role: "Организатор" }];
-  const person = memberId === "vadim" ? { id: "vadim", ...organizer, role: "Организатор" } : record.team.find((member) => member.id === memberId) ?? people[0];
+  const organizer = useOrganizer();
+  const people = eventPeople(record);
+  const person = people.find((member) => member.id === memberId) ?? organizer;
   return { record, memberId: person.id, person, people };
 }
 
@@ -74,8 +76,15 @@ function TaskField({ block }: { block: ScheduleBlock }) {
   const [value, setValue] = useState(initial);
   useEffect(() => { setValue(initial); }, [initial]);
   const ref = useRef<HTMLTextAreaElement>(null);
-  const commit = () => { if (value.trim() && value.trim() !== initial) update(block.id, { task: value }); };
-  return <textarea ref={ref} aria-label="Задача" rows={1} value={value} onChange={(event) => setValue(event.target.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); ref.current?.blur(); } if (event.key === "Escape") { setValue(initial); } }} placeholder="Описание — что делать в этой локации" style={{ fieldSizing: "content" } as React.CSSProperties} className="mt-3 block min-h-11 w-full resize-none rounded-[14px] bg-field px-4 py-3 text-callout leading-5 outline-none placeholder:text-ink-3 focus:ring-2 focus:ring-accent/50" />;
+  const commit = () => {
+    const next = value.trim();
+    if (next && next !== initial) update(block.id, { task: next });
+    else if (!next) setValue(initial);
+  };
+  return <div className="mt-3" onPointerDown={(event) => event.stopPropagation()}>
+    <p className="mb-1.5 px-1 text-caption font-semibold text-ink-2">Задача</p>
+    <textarea ref={ref} aria-label="Задача" rows={2} value={value} onChange={(event) => setValue(event.target.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); ref.current?.blur(); } if (event.key === "Escape") { setValue(initial); ref.current?.blur(); } }} placeholder="Добавьте задачу…" style={{ fieldSizing: "content" } as React.CSSProperties} className="block min-h-11 w-full resize-none rounded-[14px] bg-field px-4 py-3 text-callout leading-5 outline-none placeholder:text-ink-3 focus:ring-2 focus:ring-accent/50" />
+  </div>;
 }
 
 function TimeChip({ block }: { block: ScheduleBlock }) {
@@ -197,7 +206,7 @@ export function DesktopScheduleGrid() {
   const now = useClock();
   const minutes = now.getHours() * 60 + now.getMinutes();
   const iconFor = useIconFor();
-  const people = record.team.length ? record.team : [{ id: "vadim", ...organizer, role: "Организатор" }];
+  const people = eventPeople(record);
   const parsed = people.map((member) => ({ member, blocks: (record.schedules[member.id] ?? []).map((block) => { const range = splitRange(block.time); return { block, from: minutesOf(range.start) ?? 0, to: minutesOf(range.end) ?? 0 }; }) }));
   const all = parsed.flatMap((row) => row.blocks);
   const start = Math.floor(Math.min(8 * 60, ...all.map((item) => item.from)) / 120) * 120;

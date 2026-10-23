@@ -19,6 +19,10 @@ import {
 import type { Map as MapboxMap } from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { notificationPermission, requestNotificationPermission, showNotification } from "@/notifications";
+import { FirebaseBridge } from "@/components/FirebaseBridge";
+import { signInWithAppleOrFallback, signInWithPhoneFallback, confirmPhoneSignIn, signOutUser } from "@/lib/auth";
+import { permissionKeys, permissionLabels, type MemberPermissions } from "@/lib/permissions";
+import { eventPeople, viewerCan } from "@/store/useEmbersStore";
 
 export const spring = { type: "spring" as const, stiffness: 380, damping: 30, mass: 0.8 };
 export const cn = (...v: Array<string | false | null | undefined>) => v.filter(Boolean).join(" ");
@@ -129,8 +133,24 @@ function CircleButton({ children, onClick, light = false, label, className }: { 
 }
 
 function AuthScreen() {
-  const setScreen = useEmbersStore((s) => s.setScreen);
   const open = useEmbersStore((s) => s.openSheet);
+  const setNotice = useEmbersStore((s) => s.setNotice);
+  const setAuthBusy = useEmbersStore((s) => s.setAuthBusy);
+  const busy = useEmbersStore((s) => s.authBusy);
+  const signApple = async () => {
+    if (busy) return;
+    setAuthBusy(true);
+    try {
+      await signInWithAppleOrFallback();
+    } catch (error) {
+      const code = (error as { code?: string }).code;
+      if (code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request") {
+        setNotice(error instanceof Error ? error.message : "Не удалось войти");
+      }
+    } finally {
+      setAuthBusy(false);
+    }
+  };
   return <div className="figma-gradient on-dark flex h-full min-h-0 flex-col overflow-hidden px-5 pt-[max(16px,env(safe-area-inset-top))] text-center" data-node-id="2:3">
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-4">
       <div className="grid h-24 w-24 shrink-0 place-items-center rounded-[28px] border border-white/35 bg-white/15">
@@ -141,7 +161,7 @@ function AuthScreen() {
       <p className="mt-3 text-callout leading-5 text-[#ebebf599]">Кто где, что делает и сколько осталось —<br />в реальном времени на любом событии</p>
     </div>
     <div className="shrink-0 space-y-3 pb-[max(24px,env(safe-area-inset-bottom))]">
-      <Press onClick={() => setScreen("hub")} className="flex h-[54px] w-full items-center justify-center gap-2 rounded-full bg-white text-body font-semibold text-black"><Asset src="/figma-apple.svg" />Войти через Apple</Press>
+      <Press onClick={() => void signApple()} className="flex h-[54px] w-full items-center justify-center gap-2 rounded-full bg-white text-body font-semibold text-black"><Asset src="/figma-apple.svg" />{busy ? "Вход…" : "Войти через Apple"}</Press>
       <Press onClick={() => open("phone")} className="flex h-[54px] w-full items-center justify-center gap-2 rounded-full border border-white/30 bg-white/15 text-body font-semibold"><Asset src="/figma-phone.svg" />Войти по номеру</Press>
       <p className="px-4 pt-2 text-caption leading-4 text-[#ebebf599]">Продолжая, вы принимаете Условия использования<br />и Политику конфиденциальности</p>
     </div>
@@ -570,11 +590,7 @@ function CreateEvent() {
         <button onClick={() => open("location")} className="flex w-full flex-col items-center gap-2 border-t border-white/15 py-5 text-center"><MapPin size={22} className="text-white/80" /><span className={cn("text-body leading-6", draft.venue ? "font-semibold" : "font-medium text-white/85")}>{draft.venue ? eventPlace(draft) : "Выбрать локацию"}</span></button>
         <textarea value={draft.description} onChange={(e) => updateDraft({ description: e.target.value })} placeholder="Описание" rows={1} style={{ fontSize: "28px", fontWeight: 600, letterSpacing: "-0.03em", fieldSizing: "content" }} className="w-full resize-none bg-transparent py-8 text-center leading-tight outline-none placeholder:text-white/40" />
       </div>
-      <div className="relative mt-3 rounded-[32px] bg-[#1a040861] px-5 py-6 text-center">
-        <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[#9c613d] text-body font-semibold">ВФ</span>
-        <p className="mt-3 text-caption text-white/60">Организатор</p>
-        <p className="text-body font-semibold leading-7">Вадим Филатов</p>
-      </div>
+      <OrganizerCard />
       {showMap && draft.venue && draft.lat != null && draft.lng != null && <div className="relative mt-3 rounded-[32px] bg-[#1a040861] px-5 pb-4 pt-5 text-center">
         <button aria-label="Скрыть карту" onClick={() => setShowMap(false)} className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full bg-white/10"><X size={16} /></button>
         <MapPin size={22} className="mx-auto text-[#8eb6ff]" />
@@ -1060,15 +1076,18 @@ function MemberRow({ member, role, revealed, onReveal, onClose }: { member: Memb
 
 function TodaySchedule() {
   const record = useEmbersStore(focusedEvent);
+  const currentUser = useEmbersStore((s) => s.currentUser);
   const openSchedule = useEmbersStore((s) => s.openSchedule);
   const [scope, setScope] = useState<"all" | "me">("all");
+  const meId = currentUser?.uid ?? record.organizer.id;
+  const meName = currentUser?.name ?? record.organizer.name;
   const people = scope === "me"
-    ? [{ id: "vadim", name: "Вадим Филатов" }]
-    : [{ id: "vadim", name: "Вадим Филатов" }, ...record.team.map((member) => ({ id: member.id, name: member.name }))];
+    ? [{ id: meId, name: meName }]
+    : eventPeople(record).map((member) => ({ id: member.id, name: member.name }));
   const groups = people
     .map((person) => ({ ...person, blocks: record.schedules[person.id] ?? [] }))
     .filter((person) => scope === "me" || person.blocks.length > 0);
-  const editId = scope === "me" ? "vadim" : groups[0]?.id ?? "vadim";
+  const editId = scope === "me" ? meId : groups[0]?.id ?? record.organizer.id;
   return <section>
     <div className="flex items-center gap-3">
       <h2 className="min-w-0 flex-1 text-body font-bold">Расписание на сегодня</h2>
@@ -1213,7 +1232,7 @@ function JoinSheet() {
     <div className="mt-4 overflow-hidden rounded-[20px] bg-[#2c2c2e]"><button onClick={pasteLink} className="flex h-[52px] w-full items-center gap-3 px-4 text-body"><Asset src="/figma-link.svg" className="h-[22px] w-[22px]" />Вставить ссылку<ChevronRight className="ml-auto text-white/40" size={18} /></button><button onClick={() => setScanning((value) => !value)} className="flex h-[52px] w-full items-center gap-3 border-t border-white/15 px-4 text-body"><Asset src="/figma-qr.svg" className="h-[22px] w-[22px]" />{scanning ? "Закрыть камеру" : "Сканировать QR-код"}<ChevronRight className="ml-auto text-white/40" size={18} /></button></div>
     {scanning && <div className="mt-3 overflow-hidden rounded-[20px]"><QrScanner onCode={onCode} /></div>}
     <p className="ml-5 mt-5 text-caption text-white/50">ПРЕДПРОСМОТР</p>
-    <div className="mt-2 rounded-[20px] bg-[#2c2c2e] p-4"><div className="flex items-center gap-3"><span className="h-14 w-14 rounded-[14px] bg-gradient-to-b from-[#ff8a1f] via-[#d2321c] to-[#3b0b22]" /><div><b className="text-body">{event ? event.details.title : "Код ещё не совпал"}</b><p className="text-caption text-white/50">{event ? `Пригласил Вадим Филатов · ${event.team.length} в команде` : "Введите код события"}</p></div></div><div className="my-4 h-px bg-white/15" /><b className="text-callout">Выберите свою роль</b><div className="mt-3 flex flex-wrap gap-2">{["Свет","Звук","Видео","Фото","Продюсер","Площадка","Техник"].map((item) => <button key={item} onClick={() => setRole(item)} className={cn("h-9 rounded-full px-3.5 text-callout", role === item ? "bg-[#ff6b00]" : "bg-white/10")}>{item}</button>)}</div></div>
+    <div className="mt-2 rounded-[20px] bg-[#2c2c2e] p-4"><div className="flex items-center gap-3"><span className="h-14 w-14 rounded-[14px] bg-gradient-to-b from-[#ff8a1f] via-[#d2321c] to-[#3b0b22]" /><div><b className="text-body">{event ? event.details.title : "Код ещё не совпал"}</b><p className="text-caption text-white/50">{event ? `Пригласил ${event.organizer.name} · ${event.team.length} в команде` : "Введите код события"}</p></div></div><div className="my-4 h-px bg-white/15" /><b className="text-callout">Выберите свою роль</b><div className="mt-3 flex flex-wrap gap-2">{["Свет","Звук","Видео","Фото","Продюсер","Площадка","Техник"].map((item) => <button key={item} onClick={() => setRole(item)} className={cn("h-9 rounded-full px-3.5 text-callout", role === item ? "bg-[#ff6b00]" : "bg-white/10")}>{item}</button>)}</div></div>
     <button onClick={() => join()} className="mt-[98px] h-[54px] w-full rounded-full bg-[#ff6b00] text-body font-semibold">Присоединиться</button>
   </div>;
 }
@@ -1295,8 +1314,39 @@ function LocationSheet() {
 
 export const roleSuggestions = ["Свет", "Звук", "Видео", "Фото", "Продюсер", "Площадка", "Техник"];
 
+function OrganizerCard() {
+  const organizer = useEmbersStore((s) => focusedEvent(s).organizer);
+  const user = useEmbersStore((s) => s.currentUser);
+  const person = organizer ?? (user ? { initials: user.initials, name: user.name, color: user.color } : { initials: "•", name: "Организатор", color: "#9c613d" });
+  return <div className="relative mt-3 rounded-[32px] bg-[#1a040861] px-5 py-6 text-center">
+    <span style={{ background: person.color }} className="mx-auto grid h-12 w-12 place-items-center rounded-full text-body font-semibold">{person.initials}</span>
+    <p className="mt-3 text-caption text-white/60">Организатор</p>
+    <p className="text-body font-semibold leading-7">{person.name}</p>
+  </div>;
+}
+
+function PermissionsEditor({ memberId }: { memberId: string }) {
+  const record = useEmbersStore(focusedEvent);
+  const currentUser = useEmbersStore((s) => s.currentUser);
+  const setMemberPermissions = useEmbersStore((s) => s.setMemberPermissions);
+  const isOwner = currentUser?.uid === record.ownerId;
+  if (!isOwner || memberId === record.ownerId) return null;
+  const value = record.permissions[memberId] ?? permissionKeys.reduce((acc, key) => ({ ...acc, [key]: false }), {} as MemberPermissions);
+  const toggle = (key: (typeof permissionKeys)[number]) => {
+    setMemberPermissions(memberId, { ...value, [key]: !value[key] });
+  };
+  return <div className="mt-3 overflow-hidden rounded-[20px] bg-[#2c2c2e]">
+    <p className="px-4 pt-3 text-caption font-semibold text-white/50">Права участника</p>
+    {permissionKeys.map((key) => <button key={key} type="button" onClick={() => toggle(key)} className="flex w-full items-start gap-3 border-t border-white/10 px-4 py-3 text-left">
+      <span className="min-w-0 flex-1"><b className="block text-callout">{permissionLabels[key].title}</b><small className="text-caption text-white/45">{permissionLabels[key].hint}</small></span>
+      <span className={cn("mt-0.5 grid h-6 w-6 place-items-center rounded-full", value[key] ? "bg-[#ff6b00]" : "bg-white/15")}>{value[key] ? <Check size={14} /> : null}</span>
+    </button>)}
+  </div>;
+}
+
 function InviteSheet() {
   const record = useEmbersStore(focusedEvent);
+  const currentUser = useEmbersStore((s) => s.currentUser);
   const event = record.details;
   const team = record.team;
   const openRoles = record.openRoles;
@@ -1304,11 +1354,16 @@ function InviteSheet() {
   const addTeamMember = useEmbersStore((s) => s.addTeamMember);
   const openSchedule = useEmbersStore((s) => s.openSchedule);
   const roles = record.memberRoles;
+  const organizer = record.organizer;
+  const canManage = viewerCan({ currentUser, event: record }, "manageTeam");
+  const canInvite = viewerCan({ currentUser, event: record }, "invite");
+  const isOwner = currentUser?.uid === record.ownerId;
   const [adding, setAdding] = useState(false);
   const [roleName, setRoleName] = useState("");
   const [addingPerson, setAddingPerson] = useState(team.length === 0);
   const [personName, setPersonName] = useState("");
   const [personRole, setPersonRole] = useState("");
+  const [rightsFor, setRightsFor] = useState<string | null>(null);
   const saveRole = () => {
     if (!roleName.trim()) return;
     addOpenRole(roleName);
@@ -1316,30 +1371,32 @@ function InviteSheet() {
     setAdding(false);
   };
   const savePerson = () => {
-    if (personName.trim().length < 2) {
-      addTeamMember(personName, personRole);
-      return;
-    }
     addTeamMember(personName, personRole);
-    setPersonName("");
-    setPersonRole("");
-    setAddingPerson(false);
+    if (personName.trim().length >= 2) {
+      setPersonName("");
+      setPersonRole("");
+      setAddingPerson(false);
+    }
   };
   return <div data-node-id="2:511">
     <SheetHeader title="Команда" />
-    <div className="mt-2 flex h-[150px] items-center gap-4 rounded-[20px] bg-[#2c2c2e] p-4"><span className="grid h-24 w-24 place-items-center rounded-2xl bg-white"><Asset src="/figma-qr-large.svg" className="h-[76px] w-[76px]" /></span><div><b className="text-body">Пригласите команду</b><p className="text-callout text-[#ff6b00]">amber.app/j/{record.code}</p><p className="text-caption text-white/50">Код: {record.code}</p><button onClick={() => { void shareInvite(event.title || "Событие", record.code).then(shareResult); }} className="mt-3 flex h-9 items-center gap-2 rounded-full bg-[#ff6b00] px-3.5 text-callout font-semibold"><Share2 size={16} />Поделиться</button></div></div>
+    <div className="mt-2 flex h-[150px] items-center gap-4 rounded-[20px] bg-[#2c2c2e] p-4"><span className="grid h-24 w-24 place-items-center rounded-2xl bg-white"><Asset src="/figma-qr-large.svg" className="h-[76px] w-[76px]" /></span><div><b className="text-body">Пригласите команду</b><p className="text-callout text-[#ff6b00]">amber.app/j/{record.code}</p><p className="text-caption text-white/50">Код: {record.code}</p>{canInvite && <button onClick={() => { void shareInvite(event.title || "Событие", record.code).then(shareResult); }} className="mt-3 flex h-9 items-center gap-2 rounded-full bg-[#ff6b00] px-3.5 text-callout font-semibold"><Share2 size={16} />Поделиться</button>}</div></div>
     <p className="ml-5 mt-5 text-caption text-white/50">УЧАСТНИКИ · {team.length + 1 + openRoles.length}</p>
     <div className="mt-2 overflow-hidden rounded-[20px] bg-[#2c2c2e]">
-      <button onClick={() => openSchedule("vadim")} className="flex h-[60px] w-full items-center gap-3 px-4 text-left"><span className="grid h-10 w-10 place-items-center rounded-full bg-[#ff6b00]">ВФ</span><div className="flex-1"><p>Вадим Филатов <Crown size={13} className="inline text-[#ff6b00]" /></p><small className="text-white/50">{roles.vadim}</small></div><ChevronRight size={18} className="text-white/40" /></button>
-      {team.map((m) => <button key={m.id} onClick={() => openSchedule(m.id)} className="ml-4 flex h-[60px] w-[calc(100%-1rem)] items-center gap-3 border-t border-white/15 pr-4 text-left"><Avatar member={m} size={40} /><div className="flex-1"><p>{m.name}</p><small className="text-white/50">{roles[m.id] ?? m.role}</small></div><ChevronRight size={18} className="text-white/40" /></button>)}
+      <button onClick={() => openSchedule(organizer.id)} className="flex h-[60px] w-full items-center gap-3 px-4 text-left"><span style={{ background: organizer.color }} className="grid h-10 w-10 place-items-center rounded-full text-callout font-semibold">{organizer.initials}</span><div className="flex-1"><p>{organizer.name} <Crown size={13} className="inline text-[#ff6b00]" /></p><small className="text-white/50">{roles[organizer.id] ?? "Организатор"}</small></div><ChevronRight size={18} className="text-white/40" /></button>
+      {team.map((m) => <div key={m.id} className="border-t border-white/15">
+        <button onClick={() => openSchedule(m.id)} className="flex h-[60px] w-full items-center gap-3 px-4 text-left"><Avatar member={m} size={40} /><div className="flex-1"><p>{m.name}</p><small className="text-white/50">{roles[m.id] ?? m.role}</small></div><ChevronRight size={18} className="text-white/40" /></button>
+        {isOwner && <button type="button" onClick={() => setRightsFor(rightsFor === m.id ? null : m.id)} className="w-full px-4 pb-2 text-left text-caption font-semibold text-[#ff6b00]">{rightsFor === m.id ? "Скрыть права" : "Права"}</button>}
+        {rightsFor === m.id && <div className="px-3 pb-3"><PermissionsEditor memberId={m.id} /></div>}
+      </div>)}
       {openRoles.map((role) => <div key={role} className="ml-4 flex h-[60px] items-center gap-3 border-t border-white/15 pr-4"><span className="grid h-10 w-10 place-items-center rounded-full bg-white/10 text-caption">+</span><div><p>{role}</p><small className="text-white/50">Свободная роль</small></div></div>)}
-      {addingPerson ? <div className="border-t border-white/15 px-4 py-3">
+      {canManage && (addingPerson ? <div className="border-t border-white/15 px-4 py-3">
         <input value={personName} onChange={(event) => setPersonName(event.target.value)} onKeyDown={(event) => event.key === "Enter" && savePerson()} placeholder="Имя" className="h-11 w-full bg-transparent text-body outline-none placeholder:text-white/40" />
         <input value={personRole} onChange={(event) => setPersonRole(event.target.value)} onKeyDown={(event) => event.key === "Enter" && savePerson()} placeholder="Роль" className="h-11 w-full border-t border-white/10 bg-transparent text-body outline-none placeholder:text-white/40" />
         <div className="mt-2 flex flex-wrap gap-2">{roleSuggestions.map((item) => <button key={item} type="button" onClick={() => setPersonRole(item)} className={cn("h-8 rounded-full px-3 text-caption", personRole === item ? "bg-[#ff6b00]" : "bg-white/10")}>{item}</button>)}</div>
         <button type="button" onClick={savePerson} className="mt-3 h-10 rounded-full bg-[#ff6b00] px-4 text-callout font-semibold">Добавить</button>
-      </div> : <button onClick={() => setAddingPerson(true)} className="ml-4 flex h-[56px] w-[calc(100%-1rem)] items-center gap-3 border-t border-white/15 text-[#ff6b00]"><span className="grid h-10 w-10 place-items-center rounded-full bg-orange-500/15"><Plus /></span>Добавить участника</button>}
-      {adding ? <div className="ml-4 flex h-[56px] items-center gap-2 border-t border-white/15 pr-4"><input value={roleName} onChange={(e) => setRoleName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveRole()} placeholder="Название роли" className="h-10 flex-1 bg-transparent text-body outline-none placeholder:text-white/40" /><button onClick={saveRole} className="h-9 rounded-full bg-[#ff6b00] px-3 text-callout font-semibold">Добавить</button></div> : <button onClick={() => setAdding(true)} className="ml-4 flex h-[56px] w-[calc(100%-1rem)] items-center gap-3 border-t border-white/15 text-[#ff6b00]"><span className="grid h-10 w-10 place-items-center rounded-full bg-orange-500/15"><Plus /></span>Добавить роль</button>}
+      </div> : <button onClick={() => setAddingPerson(true)} className="ml-4 flex h-[56px] w-[calc(100%-1rem)] items-center gap-3 border-t border-white/15 text-[#ff6b00]"><span className="grid h-10 w-10 place-items-center rounded-full bg-orange-500/15"><Plus /></span>Добавить участника</button>)}
+      {canManage && (adding ? <div className="ml-4 flex h-[56px] items-center gap-2 border-t border-white/15 pr-4"><input value={roleName} onChange={(e) => setRoleName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveRole()} placeholder="Название роли" className="h-10 flex-1 bg-transparent text-body outline-none placeholder:text-white/40" /><button onClick={saveRole} className="h-9 rounded-full bg-[#ff6b00] px-3 text-callout font-semibold">Добавить</button></div> : <button onClick={() => setAdding(true)} className="ml-4 flex h-[56px] w-[calc(100%-1rem)] items-center gap-3 border-t border-white/15 text-[#ff6b00]"><span className="grid h-10 w-10 place-items-center rounded-full bg-orange-500/15"><Plus /></span>Добавить роль</button>)}
     </div>
   </div>;
 }
@@ -1402,30 +1459,32 @@ export function splitRange(time: string) {
   return { start: /^\d{2}:\d{2}$/.test(start) ? start : "18:00", end: /^\d{2}:\d{2}$/.test(end) ? end : "19:30" };
 }
 
-function ScheduleBlockCard({ block, onRemove, onChange, onDragStart }: { block: ScheduleBlock; onRemove: () => void; onChange: (patch: { task?: string; time?: string }) => void; onDragStart: (event: React.PointerEvent<HTMLDivElement>) => void }) {
+const placeholderTask = "Добавьте задачу для этой локации";
+
+function ScheduleBlockCard({ block, onRemove, onChange, onDragStart }: { block: ScheduleBlock; onRemove: () => void; onChange: (patch: { task?: string; time?: string }) => void; onDragStart: (event: React.PointerEvent) => void }) {
   const [taskEdit, setTaskEdit] = useState(false);
   const [timeEdit, setTimeEdit] = useState(false);
-  const [task, setTask] = useState(block.task);
+  const emptyTask = !block.task || block.task === placeholderTask;
+  const [task, setTask] = useState(emptyTask ? "" : block.task);
   const range = splitRange(block.time);
   const [start, setStart] = useState(range.start);
   const [end, setEnd] = useState(range.end);
   const taskRef = useRef<HTMLTextAreaElement>(null);
   const startRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLInputElement>(null);
-  const skipTask = useRef(false);
+  useEffect(() => {
+    if (!taskEdit) setTask(emptyTask ? "" : block.task);
+  }, [block.task, emptyTask, taskEdit]);
   useEffect(() => { if (taskEdit) taskRef.current?.focus(); }, [taskEdit]);
   useEffect(() => { if (timeEdit) startRef.current?.focus(); }, [timeEdit]);
-  useEffect(() => {
-    const field = taskRef.current;
-    if (!field) return;
-    field.style.height = "0px";
-    field.style.height = `${field.scrollHeight}px`;
-  }, [task, taskEdit]);
   const commitTask = () => {
-    if (skipTask.current) { skipTask.current = false; setTaskEdit(false); return; }
     const next = task.trim();
     if (next) onChange({ task: next });
-    else setTask(block.task);
+    else setTask(emptyTask ? "" : block.task);
+    setTaskEdit(false);
+  };
+  const cancelTask = () => {
+    setTask(emptyTask ? "" : block.task);
     setTaskEdit(false);
   };
   const commitTime = () => {
@@ -1436,8 +1495,24 @@ function ScheduleBlockCard({ block, onRemove, onChange, onDragStart }: { block: 
     setTimeEdit(false);
   };
   return <div className="relative rounded-[28px] bg-[#2c2c2e] p-4 shadow-[0_10px_30px_rgba(0,0,0,.18)]">
-    <div role="button" aria-label={`Переместить ${block.location}`} onPointerDown={onDragStart} className="flex cursor-grab touch-none items-center gap-2 active:cursor-grabbing"><GripVertical size={18} className="shrink-0 text-white/35" /><span style={{ background: block.color }} className="grid h-6 w-6 place-items-center rounded-md"><Camera size={15} /></span><b className="text-body">{block.location}</b><button aria-label="Удалить локацию" onPointerDown={(event) => event.stopPropagation()} onClick={onRemove} className="ml-auto grid h-6 w-6 place-items-center rounded-full bg-[#636366]"><X size={14} /></button></div>
-    <p className="mt-3 text-body">« {taskEdit ? <textarea ref={taskRef} aria-label="Задача" value={task} rows={1} onChange={(event) => setTask(event.target.value)} onBlur={commitTask} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); commitTask(); } if (event.key === "Escape") { skipTask.current = true; setTask(block.task); taskRef.current?.blur(); } }} placeholder="Что делает на этой локации" className="inline-block w-[calc(100%-2rem)] resize-none rounded-lg bg-[#ff6b0038] px-2 py-1 text-[#ff6b00] outline-none" /> : <button type="button" onClick={() => { setTask(block.task); setTaskEdit(true); }} className="rounded-lg bg-[#ff6b0038] px-2 py-1 text-left text-[#ff6b00]">{block.task}</button>} »</p>
+    <div className="flex items-center gap-2">
+      <button type="button" aria-label={`Переместить ${block.location}`} onPointerDown={onDragStart} className="grid h-8 w-8 shrink-0 cursor-grab touch-none place-items-center rounded-full text-white/35 active:cursor-grabbing"><GripVertical size={18} /></button>
+      <span style={{ background: block.color }} className="grid h-6 w-6 place-items-center rounded-md"><Camera size={15} /></span>
+      <b className="min-w-0 flex-1 truncate text-body">{block.location}</b>
+      <button type="button" aria-label="Удалить локацию" onClick={onRemove} className="grid h-6 w-6 place-items-center rounded-full bg-[#636366]"><X size={14} /></button>
+    </div>
+    <div className="mt-3">
+      <p className="mb-1.5 text-caption font-semibold text-white/45">Задача</p>
+      {taskEdit ? <div className="rounded-[16px] bg-[#ff6b0038] p-3">
+        <textarea ref={taskRef} aria-label="Задача" value={task} rows={3} onChange={(event) => setTask(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); commitTask(); } if (event.key === "Escape") { event.preventDefault(); cancelTask(); } }} placeholder="Добавьте задачу…" className="block w-full resize-none bg-transparent text-body leading-5 text-[#ff6b00] outline-none placeholder:text-[#ff6b00]/55" />
+        <div className="mt-2 flex justify-end gap-2">
+          <button type="button" onClick={cancelTask} className="h-9 rounded-full px-3 text-caption font-semibold text-white/60">Отмена</button>
+          <button type="button" onClick={commitTask} className="h-9 rounded-full bg-[#ff6b00] px-4 text-caption font-semibold text-white">Готово</button>
+        </div>
+      </div> : <button type="button" onClick={() => { setTask(emptyTask ? "" : block.task); setTaskEdit(true); }} className="w-full rounded-[16px] bg-[#ff6b0038] px-3 py-3 text-left text-body leading-5 text-[#ff6b00]">
+        {emptyTask ? "Добавьте задачу…" : block.task}
+      </button>}
+    </div>
     <p className="mt-3 text-body">с {timeEdit ? <span className="inline-flex items-center gap-1 rounded-lg bg-[#ff6b0038] px-2 py-1 text-[#ff6b00]" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) commitTime(); }}>
       <input ref={startRef} aria-label="Начало" type="time" step={60} value={start} onChange={(event) => setStart(event.target.value)} className="bg-transparent tabular outline-none [color-scheme:dark]" />
       <span>–</span>
@@ -1484,7 +1559,7 @@ function ScheduleScreen() {
   const origin = useEmbersStore((s) => s.scheduleOrigin);
   const scheduleReturn = useEmbersStore((s) => s.scheduleReturn);
   const backToTeam = () => useEmbersStore.setState({ screen: scheduleReturn, sheet: origin === "invite" ? "invite" : null });
-  const person = memberId === "vadim" ? { name: "Вадим Филатов" } : record.team.find((member) => member.id === memberId) ?? { name: "Участник" };
+  const person = eventPeople(record).find((member) => member.id === memberId) ?? record.organizer ?? { name: "Участник" };
   const shortName = person.name.split(" ")[0];
   const possessive = ({ Вадим: "Вадима", Костя: "Кости", Кирилл: "Кирилла", Аня: "Ани", Маша: "Маши", Илья: "Ильи" } as Record<string, string>)[shortName] ?? shortName;
   const [category, setCategory] = useState("");
@@ -1646,6 +1721,15 @@ function FilesSheet() {
 }
 
 export const accountEmail = "troble.gaming2001@icloud.com";
+
+function AccountProfileCard() {
+  const user = useEmbersStore((s) => s.currentUser);
+  const name = user?.name ?? "Участник";
+  const initials = user?.initials ?? "•";
+  const color = user?.color ?? "#9c613d";
+  const contact = user?.email || user?.phone || accountEmail;
+  return <div className="mt-3 flex items-center gap-3 rounded-[22px] bg-[#2c2c2e] px-4 py-3.5"><span style={{ background: color }} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-body font-semibold">{initials}</span><div className="min-w-0"><p className="text-body font-semibold">{name}</p><p className="truncate text-callout text-white/45">{contact}</p></div></div>;
+}
 
 function SettingsSwitch({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return <button type="button" role="switch" aria-checked={on} onClick={onToggle} className={cn("h-[31px] w-[51px] rounded-full p-0.5", on ? "bg-[#34c759]" : "bg-[#39393d]")}><i className={cn("block h-[27px] w-[27px] rounded-full bg-white transition-transform", on && "translate-x-5")} /></button>;
@@ -1890,8 +1974,8 @@ function AccountSheet() {
   const stateLabel = (on: boolean) => on ? "Вкл" : "Выкл";
   return <div>
     <div className="relative flex h-11 items-center justify-center"><h2 className="text-body font-semibold">Настройки</h2><div className="absolute right-0"><CircleButton onClick={close} light><Check size={20} /></CircleButton></div></div>
-    <div className="mt-3 flex items-center gap-3 rounded-[22px] bg-[#2c2c2e] px-4 py-3.5"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#9c613d] text-body font-semibold">ВФ</span><div className="min-w-0"><p className="text-body font-semibold">Вадим Филатов</p><p className="truncate text-callout text-white/45">{accountEmail}</p></div></div>
-    <p className="mt-2 px-4 text-caption leading-5 text-white/45">Вы вошли с Apple ID. Имя и фото можно сменить, когда будете отвечать на приглашение.</p>
+    <AccountProfileCard />
+    <p className="mt-2 px-4 text-caption leading-5 text-white/45">Имя и контакты видны команде события, в которое вы вступили.</p>
     <p className="mb-2 ml-4 mt-5 text-callout text-white/50">События</p>
     <button type="button" onClick={() => setPage("archive")} className="flex h-[54px] w-full items-center rounded-[22px] bg-[#2c2c2e] px-4 text-left text-body">Архив<span className="ml-auto text-white/45">{archiveCount}</span><ChevronRight size={18} className="ml-1 text-white/30" /></button>
     <div className="mt-4 space-y-2.5">
@@ -1909,7 +1993,7 @@ function AccountSheet() {
       <button type="button" onClick={() => setPage("privacy")} className="flex h-[52px] w-full items-center px-4 text-left text-body">Как используются данные<ChevronRight size={18} className="ml-auto text-white/30" /></button>
       <button type="button" onClick={() => setPage("help")} className="flex h-[52px] w-full items-center border-t border-white/10 px-4 text-left text-body">Помощь</button>
       <button type="button" onClick={() => setPage("terms")} className="flex h-[52px] w-full items-center border-t border-white/10 px-4 text-left text-body">Условия</button>
-      <button type="button" onClick={() => setScreen("auth")} className="flex h-[52px] w-full items-center border-t border-white/10 px-4 text-left text-body text-[#ff453a]">Выйти</button>
+      <button type="button" onClick={() => { void signOutUser().then(() => useEmbersStore.getState().clearSession()); }} className="flex h-[52px] w-full items-center border-t border-white/10 px-4 text-left text-body text-[#ff453a]">Выйти</button>
     </div>
   </div>;
 }
@@ -1938,6 +2022,7 @@ function NotificationsPage({ onBack }: { onBack: () => void }) {
     ["notifyStatus", "Смена статуса", "Когда вы отмечаетесь: на площадке, в пути, готов или сбор."] as const,
     ["notifyTeam", "Команда", "Когда в событие добавляют человека."] as const,
     ["notifyShifts", "Напоминания о смене", "За 20 минут до начала события и вашей локации."] as const,
+    ["notifyChanges", "Изменения в событии", "Когда меняют команду, расписание, дату или файлы."] as const,
   ];
   return <div>
     <div className="relative flex h-11 items-center"><button type="button" onClick={onBack} className="flex items-center text-body text-[#0A84FF]"><ChevronLeft size={22} />Настройки</button><h2 className="absolute inset-x-24 text-center text-body font-semibold">Уведомления</h2></div>
@@ -1995,7 +2080,8 @@ export function NotificationBridge() {
         void showNotification(title, body);
       };
       if (event.details.date === day) due(`${event.id}:event`, shiftStart(event.details.time), "Смена", `${event.details.title} начинается в ${event.details.time}`);
-      for (const block of event.schedules.vadim ?? []) due(`${event.id}:${block.id}`, shiftStart(block.time), "Смена", `${block.location} · ${block.time.split("–")[0]?.trim() ?? block.time}`);
+      const mine = state.currentUser?.uid ?? event.organizer.id;
+      for (const block of event.schedules[mine] ?? []) due(`${event.id}:${block.id}`, shiftStart(block.time), "Смена", `${block.location} · ${block.time.split("–")[0]?.trim() ?? block.time}`);
     };
     tick();
     const timer = setInterval(tick, 30000);
@@ -2005,15 +2091,48 @@ export function NotificationBridge() {
 }
 
 function PhoneSheet() {
-  const setScreen = useEmbersStore((s) => s.setScreen);
   const setPhone = useEmbersStore((s) => s.setProfilePhone);
+  const setNotice = useEmbersStore((s) => s.setNotice);
+  const setAuthBusy = useEmbersStore((s) => s.setAuthBusy);
+  const close = useEmbersStore((s) => s.closeSheet);
   const [value, setValue] = useState("");
-  const submit = () => {
-    if (value.replace(/\D/g, "").length < 10) { useEmbersStore.getState().setNotice("Введите номер полностью"); return; }
-    setPhone(value.trim());
-    setScreen("hub");
+  const [code, setCode] = useState("");
+  const [needsCode, setNeedsCode] = useState(false);
+  const [name, setName] = useState("");
+  const submit = async () => {
+    const phone = value.trim();
+    if (phone.replace(/\D/g, "").length < 10) { setNotice("Введите номер полностью"); return; }
+    setAuthBusy(true);
+    try {
+      if (needsCode) {
+        await confirmPhoneSignIn(code, name || undefined);
+        setPhone(phone);
+        close();
+        return;
+      }
+      const result = await signInWithPhoneFallback(phone, name || undefined);
+      setPhone(phone);
+      if (result.needsCode) {
+        setNeedsCode(true);
+        setNotice("Введите код из SMS");
+      } else {
+        close();
+      }
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Не удалось войти по номеру");
+    } finally {
+      setAuthBusy(false);
+    }
   };
-  return <div><SheetHeader title="Номер телефона" done={false} /><p className="mt-2 px-1 text-caption leading-5 text-white/50">Номер сохранится в аккаунте. Код подтверждения появится, когда подключим отправку сообщений.</p><input value={value} onChange={(e) => setValue(e.target.value)} inputMode="tel" placeholder="+7 900 000-00-00" className="mt-4 h-14 w-full rounded-2xl bg-[#2c2c2e] px-4 text-body outline-none placeholder:text-white/30" /><button onClick={submit} className="mt-4 h-[54px] w-full rounded-full bg-[#ff6b00] text-body font-semibold">Продолжить</button></div>;
+  return <div>
+    <SheetHeader title="Номер телефона" done={false} />
+    <div id="recaptcha-container" />
+    <p className="mt-2 px-1 text-caption leading-5 text-white/50">{needsCode ? "Введите код из SMS." : "Войдите по номеру — если SMS недоступно, создадим аккаунт с этим номером."}</p>
+    <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Имя" className="mt-4 h-14 w-full rounded-2xl bg-[#2c2c2e] px-4 text-body outline-none placeholder:text-white/30" />
+    <input value={value} onChange={(e) => setValue(e.target.value)} inputMode="tel" placeholder="+7 900 000-00-00" className="mt-3 h-14 w-full rounded-2xl bg-[#2c2c2e] px-4 text-body outline-none placeholder:text-white/30" />
+    {needsCode && <input value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" placeholder="Код из SMS" className="mt-3 h-14 w-full rounded-2xl bg-[#2c2c2e] px-4 text-body outline-none placeholder:text-white/30" />}
+    <button onClick={() => void submit()} className="mt-4 h-[54px] w-full rounded-full bg-[#ff6b00] text-body font-semibold">{needsCode ? "Подтвердить" : "Продолжить"}</button>
+  </div>;
 }
 
 function Sheets() {
@@ -2107,6 +2226,7 @@ function MobileApp() {
   usePhoneTheme(screen);
   const views = {auth:<AuthScreen/>,hub:<EventsHub/>,create:<CreateEvent/>,live:<LiveBoard/>,schedule:<ScheduleScreen/>};
   return <main className="grid h-dvh place-items-center overflow-hidden bg-black">
+    <FirebaseBridge />
     <ArchiveSweep />
     <NotificationBridge />
     <div data-vaul-drawer-wrapper="" className="phone-frame relative w-full overflow-hidden bg-black text-white">

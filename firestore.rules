@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function memberDoc(eventId) {
+      return get(/databases/$(database)/documents/events/$(eventId)/members/$(request.auth.uid)).data;
+    }
+    function isMember(eventId) {
+      return signedIn() && exists(/databases/$(database)/documents/events/$(eventId)/members/$(request.auth.uid));
+    }
+    function isOwner(eventId) {
+      return isMember(eventId) && memberDoc(eventId).isOwner == true;
+    }
+    function can(eventId, perm) {
+      return isOwner(eventId) || (isMember(eventId) && memberDoc(eventId).permissions[perm] == true);
+    }
+
+    match /users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+      match /devices/{deviceId} {
+        allow read, write: if signedIn() && request.auth.uid == uid;
+      }
+    }
+
+    match /eventCodes/{code} {
+      allow read: if signedIn();
+      allow create, update: if signedIn();
+    }
+
+    match /events/{eventId} {
+      allow read: if isMember(eventId);
+      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isOwner(eventId) || can(eventId, 'editEvent') || can(eventId, 'manageFiles') || can(eventId, 'manageLocations') || can(eventId, 'manageTeam') || can(eventId, 'invite');
+      allow delete: if isOwner(eventId);
+
+      match /members/{uid} {
+        allow read: if isMember(eventId);
+        allow create: if signedIn() && (request.auth.uid == uid || can(eventId, 'manageTeam') || isOwner(eventId));
+        allow update: if isOwner(eventId) || (signedIn() && request.auth.uid == uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['permissions', 'isOwner']));
+        allow delete: if isOwner(eventId) || (signedIn() && request.auth.uid == uid);
+      }
+
+      match /schedules/{memberId} {
+        allow read: if isMember(eventId);
+        allow write: if can(eventId, 'editSchedule');
+      }
+
+      match /activity/{activityId} {
+        allow read: if isMember(eventId);
+        allow create: if isMember(eventId);
+      }
+    }
+  }
+}

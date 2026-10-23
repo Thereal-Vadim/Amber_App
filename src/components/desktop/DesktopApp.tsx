@@ -3,8 +3,9 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { Plus } from "lucide-react";
 import { type ThemePreference, eventPhase, useEmbersStore } from "@/store/useEmbersStore";
+import { FirebaseBridge } from "@/components/FirebaseBridge";
 import { ArchiveSweep, FrameNotice, NotificationBridge, cn, useBoardEvents, useClock } from "../EmbersApp";
-import { Avatar, Button, EventThumb, Icon, Panel, PhaseDot, SectionLabel, organizer, phaseLabel, shortDate } from "./ui";
+import { Avatar, Button, EventThumb, Icon, Panel, PhaseDot, SectionLabel, phaseLabel, shortDate, useOrganizer } from "./ui";
 import { DesktopAuth } from "./auth";
 import { DesktopHub } from "./hub";
 import { DesktopLive } from "./live";
@@ -45,6 +46,16 @@ function useTheme() {
   return resolved;
 }
 
+function SidebarAccount() {
+  const open = useEmbersStore((s) => s.openSheet);
+  const organizer = useOrganizer();
+  const user = useEmbersStore((s) => s.currentUser);
+  return <button type="button" onClick={() => open("account")} className="mt-auto flex items-center gap-3 rounded-[18px] bg-field p-2.5 text-left transition-colors hover:bg-ink/15">
+    <Avatar member={user ? { initials: user.initials, color: user.color } : organizer} size={36} ring={false} />
+    <span className="min-w-0"><b className="block truncate text-callout font-semibold">{user?.name ?? organizer.name}</b><small className="text-footnote text-ink-2">Настройки</small></span>
+  </button>;
+}
+
 function Sidebar() {
   const screen = useEmbersStore((s) => s.screen);
   const activeId = useEmbersStore((s) => s.activeEventId);
@@ -81,10 +92,7 @@ function Sidebar() {
     <nav className="space-y-0.5">
       {([["Присоединиться по коду", () => open("join")], ["Заготовленные локации", () => open("locations")], [`Архив · ${archived.length}`, () => open("archive")]] as const).map(([label, action]) => <button key={label} type="button" onClick={action} className="flex h-10 w-full items-center rounded-[14px] px-2 text-left text-callout transition-colors hover:bg-ink/5">{label}</button>)}
     </nav>
-    <button type="button" onClick={() => open("account")} className="mt-auto flex items-center gap-3 rounded-[18px] bg-field p-2.5 text-left transition-colors hover:bg-ink/15">
-      <Avatar member={organizer} size={36} ring={false} />
-      <span className="min-w-0"><b className="block truncate text-callout font-semibold">{organizer.name}</b><small className="text-footnote text-ink-2">Настройки</small></span>
-    </button>
+    <SidebarAccount />
   </Panel>;
 }
 
@@ -105,6 +113,7 @@ export default function DesktopApp() {
   const screen = useEmbersStore((s) => s.screen);
   const theme = useTheme();
   return <div className="ds fixed inset-0 overflow-hidden" data-theme={theme}>
+    <FirebaseBridge />
     <ArchiveSweep />
     <NotificationBridge />
     {screen === "auth" ? <DesktopAuth /> : <Workspace />}

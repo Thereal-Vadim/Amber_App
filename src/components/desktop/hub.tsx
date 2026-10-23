@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Plus, Search, Trash2, Archive } from "lucide-react";
 import { type EventRecord, eventPhase, eventWhen, useEmbersStore } from "@/store/useEmbersStore";
 import { cn, spring, useBoardEvents, useClock } from "../EmbersApp";
-import { Avatar, Button, Icon, IconButton, PhaseBadge, Segmented, organizer } from "./ui";
+import { Avatar, Button, Icon, IconButton, PhaseBadge, Segmented, useOrganizer } from "./ui";
 import { useArchived } from "./modals";
 
 export function PageHeader({ title, subtitle, children }: { title: string; subtitle?: string; children?: React.ReactNode }) {
@@ -20,7 +20,9 @@ export function PageHeader({ title, subtitle, children }: { title: string; subti
 
 export function AccountButton() {
   const open = useEmbersStore((s) => s.openSheet);
-  return <button type="button" aria-label="Настройки" onClick={() => open("account")} className="rounded-full transition-transform hover:scale-105"><Avatar member={organizer} size={40} ring={false} /></button>;
+  const organizer = useOrganizer();
+  const user = useEmbersStore((s) => s.currentUser);
+  return <button type="button" aria-label="Настройки" onClick={() => open("account")} className="rounded-full transition-transform hover:scale-105"><Avatar member={user ? { initials: user.initials, color: user.color } : organizer} size={40} ring={false} /></button>;
 }
 
 function EventTile({ record, onOpen }: { record: EventRecord; onOpen: () => void }) {

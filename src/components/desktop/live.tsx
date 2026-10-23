@@ -40,7 +40,7 @@ function DayTimeline() {
   const record = useEmbersStore(focusedEvent);
   const now = useClock();
   const minutes = now.getHours() * 60 + now.getMinutes();
-  const ranges = scheduleRanges(record.schedules, ["vadim", ...record.team.map((member) => member.id)]);
+  const ranges = scheduleRanges(record.schedules, [record.organizer.id, ...record.team.map((member) => member.id)]);
   const { start, end } = timelineBounds(ranges);
   const span = end - start;
   const at = (value: number) => `${((value - start) / span) * 100}%`;
@@ -72,7 +72,7 @@ function LiveHeader() {
   const archiveEvent = useEmbersStore((s) => s.archiveEvent);
   const setScreen = useEmbersStore((s) => s.setScreen);
   const event = record.details;
-  const firstMember = record.team[0]?.id ?? "vadim";
+  const firstMember = record.team[0]?.id ?? record.organizer.id;
   return <section className="relative shrink-0 overflow-hidden rounded-panel p-6 pb-5 text-white shadow-[0_24px_60px_rgba(0,0,0,.25)]" style={{ background: "linear-gradient(180deg, #ff6b00 0%, #c42a1a 42%, #3b0b22 82%, #1a0710 100%)" }}>
     {event.cover && <span className="absolute inset-0 bg-cover bg-center opacity-40" style={{ backgroundImage: `url(${event.cover})` }} />}
     <div className="relative flex items-start gap-4">
@@ -99,7 +99,8 @@ function MyStatusRow() {
   const record = useEmbersStore(focusedEvent);
   const open = useEmbersStore((s) => s.openSheet);
   const meta = statusMeta[record.myStatus];
-  const myBlock = record.schedules.vadim?.[0]?.location;
+  const myId = useEmbersStore((s) => s.currentUser?.uid ?? record.organizer.id);
+  const myBlock = record.schedules[myId]?.[0]?.location;
   return <Panel className="flex h-[68px] shrink-0 items-center gap-4 rounded-[22px] px-4">
     <span className="grid h-9 w-9 place-items-center rounded-full" style={{ background: `color-mix(in srgb, ${meta.color} 22%, transparent)` }}><i className="h-3.5 w-3.5 rounded-full" style={{ background: meta.color }} /></span>
     <div className="min-w-0 flex-1">

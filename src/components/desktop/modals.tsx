@@ -11,7 +11,9 @@ import {
   type MapPlace, LocationMark, QrScanner, TrackingMap, accountEmail, cn, knownPlaces, locationIconLabel, locationIconMap, roleSuggestions, ruDays,
   shareInvite, shareResult, startDictation, timezones, useClock,
 } from "../EmbersApp";
-import { Avatar, Button, Chip, EmptyNote, EventThumb, Icon, IconButton, ListGroup, ListRow, Modal, PhaseBadge, Segmented, Switch, TextField, organizer } from "./ui";
+import { permissionKeys, permissionLabels, type MemberPermissions } from "@/lib/permissions";
+import { signOutUser } from "@/lib/auth";
+import { Avatar, Button, Chip, EmptyNote, EventThumb, Icon, IconButton, ListGroup, ListRow, Modal, PhaseBadge, Segmented, Switch, TextField, useOrganizer } from "./ui";
 
 export function useArchived() {
   const events = useEmbersStore((s) => s.events);
@@ -43,7 +45,7 @@ function JoinModal() {
       <input ref={inputRef} autoFocus aria-label="Код приглашения" value={code} onChange={(e) => setCode(e.target.value)} onPaste={(e) => { const found = extract(e.clipboardData.getData("text")); if (found) { e.preventDefault(); setCode(found); } }} onKeyDown={(e) => e.key === "Enter" && join()} className="absolute inset-0 z-10 cursor-text opacity-0" />
       <div className="flex gap-2.5">{Array.from({ length: 6 }, (_, i) => <span key={i} className={cn("grid h-[60px] w-[52px] place-items-center rounded-[14px] bg-field text-[26px] font-semibold tabular", i === code.length && "ring-2 ring-accent")}>{code[i] ?? ""}</span>)}</div>
     </div>
-    <p className={cn("mt-3 min-h-4 text-footnote", error ? "text-danger" : "text-ink-2")}>{error || (event ? `${event.details.title} · пригласил ${organizer.name} · ${event.team.length} в команде` : "")}</p>
+    <p className={cn("mt-3 min-h-4 text-footnote", error ? "text-danger" : "text-ink-2")}>{error || (event ? `${event.details.title} · пригласил ${event.organizer.name} · ${event.team.length} в команде` : "")}</p>
     <div className="my-5 h-px bg-line" />
     <p className="text-caption text-ink-2">или отсканируйте QR с телефона организатора</p>
     <div className="mt-4 flex justify-center">
@@ -147,16 +149,34 @@ function LocationModal() {
   </div>;
 }
 
+function DesktopPermissions({ memberId }: { memberId: string }) {
+  const record = useEmbersStore(focusedEvent);
+  const currentUser = useEmbersStore((s) => s.currentUser);
+  const setMemberPermissions = useEmbersStore((s) => s.setMemberPermissions);
+  if (currentUser?.uid !== record.ownerId || memberId === record.ownerId) return null;
+  const value = record.permissions[memberId] ?? permissionKeys.reduce((acc, key) => ({ ...acc, [key]: false }), {} as MemberPermissions);
+  return <div className="mt-2 space-y-1 rounded-[14px] bg-field p-2">
+    {permissionKeys.map((key) => <button key={key} type="button" onClick={() => setMemberPermissions(memberId, { ...value, [key]: !value[key] })} className="flex w-full items-center gap-2 rounded-[10px] px-2 py-1.5 text-left hover:bg-ink/5">
+      <span className="min-w-0 flex-1"><b className="block text-footnote">{permissionLabels[key].title}</b><small className="text-footnote text-ink-3">{permissionLabels[key].hint}</small></span>
+      <span className={cn("grid h-5 w-5 place-items-center rounded-full", value[key] ? "bg-accent text-on-accent" : "bg-ink/15")}>{value[key] ? <Check size={12} /> : null}</span>
+    </button>)}
+  </div>;
+}
+
 function InviteModal() {
   const record = useEmbersStore(focusedEvent);
+  const organizer = useOrganizer();
+  const currentUser = useEmbersStore((s) => s.currentUser);
   const addOpenRole = useEmbersStore((s) => s.addOpenRole);
   const addTeamMember = useEmbersStore((s) => s.addTeamMember);
   const openSchedule = useEmbersStore((s) => s.openSchedule);
   const setView = useEmbersStore((s) => s.setScheduleView);
   const setNotice = useEmbersStore((s) => s.setNotice);
+  const isOwner = currentUser?.uid === record.ownerId;
   const [personName, setPersonName] = useState("");
   const [personRole, setPersonRole] = useState("");
   const [roleName, setRoleName] = useState("");
+  const [rightsFor, setRightsFor] = useState<string | null>(null);
   const link = `amber.app/j/${record.code}`;
   const savePerson = () => {
     const before = record.team.length;
@@ -179,16 +199,20 @@ function InviteModal() {
     </div>
     <Group label={`Участники · ${record.team.length + 1 + record.openRoles.length}`}>
       <ListGroup>
-        <button type="button" onClick={() => schedule("vadim")} className="flex h-14 w-full items-center gap-3 px-4 text-left hover:bg-ink/5">
+        <button type="button" onClick={() => schedule(organizer.id)} className="flex h-14 w-full items-center gap-3 px-4 text-left hover:bg-ink/5">
           <Avatar member={organizer} size={36} ring={false} />
-          <span className="min-w-0 flex-1"><b className="flex items-center gap-1.5 text-callout font-semibold">{organizer.name}<Icon name="crown" size={13} className="text-accent" /></b><small className="text-footnote text-ink-2">{record.memberRoles.vadim}</small></span>
+          <span className="min-w-0 flex-1"><b className="flex items-center gap-1.5 text-callout font-semibold">{organizer.name}<Icon name="crown" size={13} className="text-accent" /></b><small className="text-footnote text-ink-2">{record.memberRoles[organizer.id] ?? "Организатор"}</small></span>
           <span className="text-caption text-ink-3">Расписание ›</span>
         </button>
-        {record.team.map((member) => <button key={member.id} type="button" onClick={() => schedule(member.id)} className="flex h-14 w-full items-center gap-3 px-4 text-left hover:bg-ink/5">
-          <Avatar member={member} size={36} ring={false} />
-          <span className="min-w-0 flex-1"><b className="block truncate text-callout font-semibold">{member.name}</b><small className="text-footnote text-ink-2">{record.memberRoles[member.id] ?? member.role}</small></span>
-          <span className="text-caption text-ink-3">Расписание ›</span>
-        </button>)}
+        {record.team.map((member) => <div key={member.id}>
+          <button type="button" onClick={() => schedule(member.id)} className="flex h-14 w-full items-center gap-3 px-4 text-left hover:bg-ink/5">
+            <Avatar member={member} size={36} ring={false} />
+            <span className="min-w-0 flex-1"><b className="block truncate text-callout font-semibold">{member.name}</b><small className="text-footnote text-ink-2">{record.memberRoles[member.id] ?? member.role}</small></span>
+            <span className="text-caption text-ink-3">Расписание ›</span>
+          </button>
+          {isOwner && <button type="button" onClick={() => setRightsFor(rightsFor === member.id ? null : member.id)} className="w-full px-4 pb-2 text-left text-footnote font-semibold text-accent">{rightsFor === member.id ? "Скрыть права" : "Права"}</button>}
+          {rightsFor === member.id && <div className="px-3 pb-3"><DesktopPermissions memberId={member.id} /></div>}
+        </div>)}
         {record.openRoles.map((role) => <div key={role} className="flex h-14 items-center gap-3 px-4">
           <span className="grid h-9 w-9 place-items-center rounded-full bg-field text-ink-2"><Plus size={16} /></span>
           <span><b className="block text-callout font-semibold">{role}</b><small className="text-footnote text-ink-2">Свободная роль</small></span>
@@ -394,7 +418,7 @@ function NotificationsPage() {
     await showNotification("Amber", "Уведомления включены. Пришлём смену статуса, новости команды и напоминание о смене.");
   };
   const on = prefs.notifications && permission === "granted";
-  const kinds = [["notifyStatus", "Смена статуса", "Когда вы отмечаетесь: на площадке, в пути, готов или сбор."], ["notifyTeam", "Команда", "Когда в событие добавляют человека."], ["notifyShifts", "Напоминания о смене", "За 20 минут до начала события и вашей локации."]] as const;
+  const kinds = [["notifyStatus", "Смена статуса", "Когда вы отмечаетесь: на площадке, в пути, готов или сбор."], ["notifyTeam", "Команда", "Когда в событие добавляют человека."], ["notifyShifts", "Напоминания о смене", "За 20 минут до начала события и вашей локации."], ["notifyChanges", "Изменения в событии", "Когда меняют команду, расписание, дату или файлы."]] as const;
   return <>
     <ListGroup><ListRow value={<Switch on={on} onToggle={() => { void enable(); }} label="Уведомления" />}>Уведомления</ListRow></ListGroup>
     <Note>{permission === "denied" ? "Браузер запретил уведомления. Разрешите их для Amber в настройках сайта, затем включите переключатель снова." : on ? "Amber пришлёт смену статуса, новости команды и напоминание за 20 минут до смены." : "Включение запросит разрешение. Пока оно выключено, Amber ничего не присылает."}</Note>
@@ -403,11 +427,12 @@ function NotificationsPage() {
 }
 
 function SettingsBody({ page, setPage }: { page: SettingsPage; setPage: (page: SettingsPage) => void }) {
-  const setScreen = useEmbersStore((s) => s.setScreen);
   const prefs = useEmbersStore((s) => s.accountPrefs);
   const setPref = useEmbersStore((s) => s.setAccountPref);
   const theme = useEmbersStore((s) => s.theme);
   const setTheme = useEmbersStore((s) => s.setTheme);
+  const user = useEmbersStore((s) => s.currentUser);
+  const organizer = useOrganizer();
   const locationCount = useEmbersStore((s) => focusedEvent(s).locationGroups.reduce((sum, group) => sum + group.locations.length, 0));
   const archived = useArchived();
   if (page === "notifications") return <NotificationsPage />;
@@ -420,9 +445,9 @@ function SettingsBody({ page, setPage }: { page: SettingsPage; setPage: (page: S
   }
   if (page === "privacy" || page === "help" || page === "terms") {
     const copy = {
-      privacy: "Amber хранит событие, команду и расписание на этом устройстве. В демо-версии данные никуда не отправляются.",
-      help: "Нажмите на человека в команде, чтобы открыть его карточку и расписание. В программе события можно приложить PDF: проходки, инструкции и другие файлы.",
-      terms: "Продолжая пользоваться Amber, вы соглашаетесь с правилами сервиса. Это демонстрационная версия.",
+      privacy: "Amber хранит событие, команду и расписание в облаке Firebase. Читать данные могут только участники события.",
+      help: "Нажмите на человека в команде, чтобы открыть его карточку и расписание. Организатор выдаёт права в разделе «Команда».",
+      terms: "Продолжая пользоваться Amber, вы соглашаетесь с правилами сервиса.",
     }[page];
     return <p className="px-1 text-body leading-6 text-ink-2">{copy}</p>;
   }
@@ -430,12 +455,13 @@ function SettingsBody({ page, setPage }: { page: SettingsPage; setPage: (page: S
   if (page === "locations") return <PresetLocations onEdit={(id) => setPage(`edit:${id}`)} />;
   if (page.startsWith("edit:")) return <LocationEditor id={page.slice(5)} />;
   const state = (on: boolean) => on ? "Вкл" : "Выкл";
+  const contact = user?.email || user?.phone || accountEmail;
   return <>
     <div className="flex items-center gap-3 rounded-card bg-raised p-3.5">
-      <Avatar member={organizer} size={44} ring={false} />
-      <div className="min-w-0"><p className="text-callout font-semibold">{organizer.name}</p><p className="truncate text-caption text-ink-2">{accountEmail}</p></div>
+      <Avatar member={user ? { initials: user.initials, color: user.color } : organizer} size={44} ring={false} />
+      <div className="min-w-0"><p className="text-callout font-semibold">{user?.name ?? organizer.name}</p><p className="truncate text-caption text-ink-2">{contact}</p></div>
     </div>
-    <Note>Вы вошли с Apple ID. Имя и фото можно сменить, когда будете отвечать на приглашение.</Note>
+    <Note>Имя и контакты видны команде события, в которое вы вступили.</Note>
     <Group label="События">
       <div className="space-y-2">
         <ListGroup><ListRow onClick={() => setPage("archive")} value={archived.length}>Архив</ListRow></ListGroup>
@@ -458,7 +484,7 @@ function SettingsBody({ page, setPage }: { page: SettingsPage; setPage: (page: S
         <ListRow onClick={() => setPage("privacy")}>Как используются данные</ListRow>
         <ListRow onClick={() => setPage("help")} chevron={false}>Помощь</ListRow>
         <ListRow onClick={() => setPage("terms")} chevron={false}>Условия</ListRow>
-        <ListRow onClick={() => setScreen("auth")} chevron={false} danger>Выйти</ListRow>
+        <ListRow onClick={() => { void signOutUser().then(() => useEmbersStore.getState().clearSession()); }} chevron={false} danger>Выйти</ListRow>
       </ListGroup>
     </Group>
   </>;

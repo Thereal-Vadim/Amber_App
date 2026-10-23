@@ -4,9 +4,17 @@ import { useRef } from "react";
 import { ImagePlus, Plus } from "lucide-react";
 import { blankDraft, eventPlace, eventWhen, useEmbersStore } from "@/store/useEmbersStore";
 import { TrackingMap, cn } from "../EmbersApp";
-import { Avatar, Button, Icon, IconButton, Panel, SectionLabel, organizer } from "./ui";
+import { Avatar, Button, Icon, IconButton, Panel, SectionLabel, useOrganizer } from "./ui";
 
 const emptyTeam: never[] = [];
+
+function CreateOrganizerCard() {
+  const organizer = useOrganizer();
+  return <>
+    <Avatar member={organizer} size={44} ring={false} />
+    <p className="mt-2 text-caption text-ink-2">Организатор · {organizer.name}</p>
+  </>;
+}
 
 export function DesktopCreate() {
   const setScreen = useEmbersStore((s) => s.setScreen);
@@ -49,8 +57,7 @@ export function DesktopCreate() {
           </button>
           <textarea value={draft.description} onChange={(event) => updateDraft({ description: event.target.value })} placeholder="Описание" rows={1} style={{ fieldSizing: "content" } as React.CSSProperties} className={cn(bigField, "block py-7")} />
           <div className="flex flex-col items-center py-5">
-            <Avatar member={organizer} size={44} ring={false} />
-            <p className="mt-2 text-caption text-ink-2">Организатор · {organizer.name}</p>
+            <CreateOrganizerCard />
           </div>
         </Panel>
         <p className="mt-6 text-center text-caption text-ink-2">Пригласите команду ссылкой после создания — код появится автоматически</p>

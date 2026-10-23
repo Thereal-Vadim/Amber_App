@@ -3,7 +3,7 @@
 import { useEffect, useId, type CSSProperties, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { type EventPhase, type Member, type Status, statusMeta } from "@/store/useEmbersStore";
+import { type EventPhase, type Member, type Status, focusedEvent, statusMeta, useEmbersStore } from "@/store/useEmbersStore";
 import { cn, spring } from "../EmbersApp";
 
 export type IconName =
@@ -55,7 +55,33 @@ export function Avatar({ member, size = 36, ring = true }: { member: Pick<Member
   return <span style={{ width: size, height: size, background: member.color, fontSize: Math.max(11, Math.round(size * .36)) }} className={cn("grid shrink-0 place-items-center rounded-full font-semibold text-white", ring && "ring-2 ring-white/90")}>{member.initials}</span>;
 }
 
-export const organizer = { initials: "ВФ", color: "#9c613d", name: "Вадим Филатов" };
+export const organizerFallback = { initials: "ВФ", color: "#9c613d", name: "Вадим Филатов", id: "vadim" };
+
+/** Live organizer from the focused event or signed-in user. */
+export function useOrganizer() {
+  const currentUser = useEmbersStore((s) => s.currentUser);
+  const record = useEmbersStore(focusedEvent);
+  if (record.organizer) return record.organizer;
+  if (currentUser) {
+    return {
+      id: currentUser.uid,
+      initials: currentUser.initials,
+      color: currentUser.color,
+      name: currentUser.name,
+      role: "Организатор",
+      status: "on_site" as const,
+      spot: "",
+      currentTask: "",
+      next: "",
+      phone: currentUser.phone,
+      coords: { x: 50, y: 50 },
+    };
+  }
+  return { ...organizerFallback, role: "Организатор", status: "on_site" as const, spot: "", currentTask: "", next: "", phone: "", coords: { x: 50, y: 50 } };
+}
+
+/** @deprecated use useOrganizer() — kept for static imports during migration */
+export const organizer = organizerFallback;
 
 export function StatusPill({ status, size = "md" }: { status: Status; size?: "sm" | "md" }) {
   const meta = statusMeta[status];

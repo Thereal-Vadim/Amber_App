@@ -1,21 +1,38 @@
 "use client";
 
 import { useState } from "react";
+import { signInWithAppleOrFallback } from "@/lib/auth";
 import { useEmbersStore } from "@/store/useEmbersStore";
 import { cn } from "../EmbersApp";
 import { Button, Icon } from "./ui";
 
 export function DesktopAuth() {
-  const setScreen = useEmbersStore((s) => s.setScreen);
   const open = useEmbersStore((s) => s.openSheet);
   const setJoinCode = useEmbersStore((s) => s.setJoinCode);
   const joinByCode = useEmbersStore((s) => s.joinByCode);
+  const setAuthBusy = useEmbersStore((s) => s.setAuthBusy);
+  const setNotice = useEmbersStore((s) => s.setNotice);
+  const busy = useEmbersStore((s) => s.authBusy);
   const error = useEmbersStore((s) => s.joinError);
   const [code, setCode] = useState("");
   const join = () => {
     const found = code.toUpperCase().match(/[A-Z0-9]{6}/g)?.at(-1) ?? code;
     setJoinCode(found);
     joinByCode(found);
+  };
+  const signApple = async () => {
+    if (busy) return;
+    setAuthBusy(true);
+    try {
+      await signInWithAppleOrFallback();
+    } catch (err) {
+      const c = (err as { code?: string }).code;
+      if (c !== "auth/popup-closed-by-user" && c !== "auth/cancelled-popup-request") {
+        setNotice(err instanceof Error ? err.message : "Не удалось войти");
+      }
+    } finally {
+      setAuthBusy(false);
+    }
   };
   return <div className="bg-hero relative flex h-full items-center overflow-hidden px-[clamp(48px,7vw,120px)]">
     <div className="flex min-w-0 flex-1 flex-col items-start pr-12">
@@ -28,7 +45,7 @@ export function DesktopAuth() {
       <h2 className="text-[26px] font-bold tracking-[-.02em]">Войти</h2>
       <p className="mt-2 text-callout leading-5 text-ink-2">Создавайте события, собирайте команду и следите за ней с компьютера</p>
       <div className="mt-7 space-y-3">
-        <Button tone="inverse" size="lg" className="w-full" onClick={() => setScreen("hub")}><Icon name="apple" size={20} />Войти через Apple</Button>
+        <Button tone="inverse" size="lg" className="w-full" onClick={() => void signApple()}><Icon name="apple" size={20} />{busy ? "Вход…" : "Войти через Apple"}</Button>
         <Button tone="hero" size="lg" className="w-full" onClick={() => open("phone")}><Icon name="phone" size={18} />Войти по номеру</Button>
       </div>
       <div className="my-6 h-px bg-ink/15" />

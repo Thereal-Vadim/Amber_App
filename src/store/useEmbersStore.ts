@@ -2,12 +2,26 @@
 
 import { create } from "zustand";
 import { z } from "zod";
+import type { AuthProfile } from "@/lib/auth";
+import { allPermissions, can as canPerm, noPermissions, type MemberPermissions, type PermissionKey } from "@/lib/permissions";
+import {
+  createEventRemote,
+  joinEventByCode,
+  postActivity,
+  pushEventFields,
+  pushMember,
+  pushSchedule,
+  updateMemberFields,
+  updateMemberPermissions,
+  type MemberDoc,
+} from "@/lib/eventsApi";
 
 export type Status = "on_site" | "in_transit" | "ready" | "gathering";
 export type Screen = "auth" | "hub" | "create" | "live" | "schedule";
-export type Sheet = null | "join" | "member" | "status" | "datetime" | "location" | "invite" | "account" | "phone" | "files" | "archive" | "locations";
+export type Sheet = null | "join" | "member" | "status" | "datetime" | "location" | "invite" | "account" | "phone" | "files" | "archive" | "locations" | "permissions";
 export type ThemePreference = "system" | "light" | "dark";
 export type ScheduleView = "list" | "grid";
+export type { PermissionKey, MemberPermissions };
 
 export type Member = {
   id: string;
@@ -121,10 +135,13 @@ export const team: Member[] = [
 export type EventRecord = {
   id: string;
   code: string;
+  ownerId: string;
+  organizer: Member;
   details: EventDetails;
   team: Member[];
   schedules: Record<string, ScheduleBlock[]>;
   memberRoles: Record<string, string>;
+  permissions: Record<string, MemberPermissions>;
   openRoles: string[];
   programFiles: ProgramFile[];
   locationGroups: LocationGroup[];
@@ -133,6 +150,16 @@ export type EventRecord = {
   archivedAt: number | null;
   /** Past events stay on the board after the user returns them from the archive. */
   boardPinned?: boolean;
+};
+
+type AccountPrefs = {
+  notifications: boolean;
+  notifyStatus: boolean;
+  notifyShifts: boolean;
+  notifyTeam: boolean;
+  notifyChanges: boolean;
+  calendar: boolean;
+  emailUpdates: boolean;
 };
 
 type Store = {
@@ -151,9 +178,12 @@ type Store = {
   draftEvent: EventRecord | null;
   scheduleOrigin: "live" | "invite";
   scheduleReturn: "live" | "create";
-  accountPrefs: { notifications: boolean; notifyStatus: boolean; notifyShifts: boolean; notifyTeam: boolean; calendar: boolean; emailUpdates: boolean };
+  accountPrefs: AccountPrefs;
   theme: ThemePreference;
   scheduleView: ScheduleView;
+  currentUser: AuthProfile | null;
+  authReady: boolean;
+  authBusy: boolean;
   setTheme: (theme: ThemePreference) => void;
   setScheduleView: (view: ScheduleView) => void;
   shelveDraft: () => void;
@@ -176,6 +206,7 @@ type Store = {
   setProfilePhone: (phone: string) => void;
   setNotice: (notice: string) => void;
   joinByCode: (code?: string) => boolean;
+  joinEventRemote: (code?: string) => Promise<boolean>;
   updateDraft: (patch: Partial<EventDetails>) => void;
   toggleAllDay: () => void;
   createEvent: () => void;
@@ -187,6 +218,7 @@ type Store = {
   updateScheduleBlock: (id: string, patch: Partial<Pick<ScheduleBlock, "task" | "time" | "travel">>) => void;
   openSchedule: (memberId: string, origin?: "live" | "invite") => void;
   setMemberRole: (id: string, role: string) => void;
+  setMemberPermissions: (memberId: string, permissions: MemberPermissions) => void;
   addProgramFile: (file: ProgramFile) => void;
   removeProgramFile: (id: string) => void;
   addLocationGroup: (name: string) => void;
@@ -194,7 +226,13 @@ type Store = {
   addPresetLocation: (group: string, name: string) => void;
   updatePresetLocation: (id: string, patch: { group?: string; color?: string; icon?: LocationIcon }) => void;
   removePresetLocation: (group: string, id: string) => void;
-  setAccountPref: (key: "notifications" | "notifyStatus" | "notifyShifts" | "notifyTeam" | "calendar" | "emailUpdates", value: boolean) => void;
+  setAccountPref: (key: keyof AccountPrefs, value: boolean) => void;
+  setCurrentUser: (user: AuthProfile | null) => void;
+  setAuthReady: (ready: boolean) => void;
+  setAuthBusy: (busy: boolean) => void;
+  replaceEvents: (events: EventRecord[], activeEventId?: string) => void;
+  upsertRemoteEvent: (record: EventRecord) => void;
+  clearSession: () => void;
 };
 
 const joinCodeSchema = z.string().regex(/^[A-Z0-9]{6}$/, "Введите 6 символов");
@@ -290,14 +328,47 @@ function eventCode() {
   return Array.from({ length: 6 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("");
 }
 
-function blankRecord(code: string): EventRecord {
+const demoOrganizer: Member = {
+  id: "vadim",
+  initials: "ВФ",
+  name: "Вадим Филатов",
+  role: "Организатор",
+  color: "#9c613d",
+  status: "on_site",
+  spot: "Площадка",
+  currentTask: "Организация",
+  next: "Расписание",
+  phone: "",
+  coords: { x: 48, y: 48 },
+};
+
+function blankRecord(code: string, owner?: AuthProfile | null): EventRecord {
+  const organizer: Member = owner
+    ? {
+        id: owner.uid,
+        initials: owner.initials,
+        name: owner.name,
+        role: "Организатор",
+        color: owner.color,
+        status: "on_site",
+        spot: "Площадка",
+        currentTask: "Организация",
+        next: "Расписание",
+        phone: owner.phone,
+        coords: { x: 48, y: 48 },
+      }
+    : { ...demoOrganizer };
+  const ownerId = organizer.id;
   return {
     id: `event-${Date.now()}`,
     code,
+    ownerId,
+    organizer,
     details: { ...blankDraft },
     team: [],
-    schedules: { vadim: [] },
-    memberRoles: { vadim: "Организатор" },
+    schedules: { [ownerId]: [] },
+    memberRoles: { [ownerId]: "Организатор" },
+    permissions: { [ownerId]: allPermissions() },
     openRoles: [],
     programFiles: [],
     locationGroups: cloneGroups(initialLocationGroups),
@@ -310,6 +381,8 @@ function blankRecord(code: string): EventRecord {
 const demoRecord: EventRecord = {
   id: "gorodskoe-okno",
   code: "K7Q2X9",
+  ownerId: "vadim",
+  organizer: { ...demoOrganizer },
   details: { ...demoEvent },
   team: team.map((member) => ({ ...member, coords: { ...member.coords } })),
   schedules: {
@@ -321,6 +394,14 @@ const demoRecord: EventRecord = {
     vadim: [],
   },
   memberRoles: { vadim: "Организатор", kostya: "Свет", kirill: "Техник", anya: "Видео", masha: "Фото", ilya: "Звук" },
+  permissions: {
+    vadim: allPermissions(),
+    kostya: noPermissions(),
+    kirill: noPermissions(),
+    anya: noPermissions(),
+    masha: noPermissions(),
+    ilya: noPermissions(),
+  },
   openRoles: [],
   programFiles: [],
   locationGroups: cloneGroups(initialLocationGroups),
@@ -329,12 +410,24 @@ const demoRecord: EventRecord = {
   archivedAt: null,
 };
 
+export function eventPeople(event: EventRecord) {
+  return [event.organizer, ...event.team];
+}
+
+export function viewerCan(state: Pick<Store, "currentUser"> & { event: EventRecord }, key: PermissionKey) {
+  const uid = state.currentUser?.uid;
+  if (!uid) return false;
+  if (state.event.ownerId === uid) return true;
+  const permissions = state.event.permissions[uid] ?? noPermissions();
+  return canPerm({ isOwner: false, permissions }, key);
+}
+
 type FocusState = Pick<Store, "screen" | "scheduleOrigin" | "draftEvent" | "events" | "activeEventId">;
 
 export function focusedEvent(state: FocusState) {
   const editing = Boolean(state.draftEvent) && (state.screen === "create" || (state.screen === "schedule" && state.scheduleOrigin === "invite"));
   if (editing && state.draftEvent) return state.draftEvent;
-  return state.events.find((event) => event.id === state.activeEventId) ?? state.events[0] ?? demoRecord;
+  return state.events.find((event) => event.id === state.activeEventId) ?? state.events[0] ?? blankRecord("------", null);
 }
 
 function withFocus(state: FocusState, change: (event: EventRecord) => EventRecord) {
@@ -342,6 +435,26 @@ function withFocus(state: FocusState, change: (event: EventRecord) => EventRecor
     return { draftEvent: change(state.draftEvent) };
   }
   return { events: state.events.map((event) => event.id === state.activeEventId ? change(event) : event) };
+}
+
+function remoteEnabled(state: Pick<Store, "currentUser">) {
+  return Boolean(state.currentUser?.uid);
+}
+
+function syncSchedule(state: Store, memberId: string) {
+  if (!remoteEnabled(state)) return;
+  const event = focusedEvent(state);
+  const blocks = event.schedules[memberId] ?? [];
+  void pushSchedule(event.id, memberId, blocks).catch(() => undefined);
+}
+
+function syncEventMeta(state: Store, patch: Parameters<typeof pushEventFields>[1], activity?: { kind: "team" | "schedule" | "event" | "files" | "locations"; text: string }) {
+  if (!remoteEnabled(state)) return;
+  const event = focusedEvent(state);
+  void pushEventFields(event.id, patch).catch(() => undefined);
+  if (activity && state.currentUser) {
+    void postActivity(event.id, state.currentUser.uid, activity.kind, activity.text).catch(() => undefined);
+  }
 }
 
 export function isOnBoard(event: EventRecord, now: number) {
@@ -360,10 +473,10 @@ function boardNeighbor(events: EventRecord[], id: string, now: number) {
   return (board[index + 1] ?? board[index - 1])?.id;
 }
 
-export const useEmbersStore = create<Store>((set) => ({
+export const useEmbersStore = create<Store>((set, get) => ({
   screen: "auth",
   sheet: null,
-  selectedMemberId: "kostya",
+  selectedMemberId: "",
   teamFilter: "all",
   joined: false,
   joinCode: "",
@@ -371,16 +484,48 @@ export const useEmbersStore = create<Store>((set) => ({
   joinError: "",
   profilePhone: "",
   notice: "",
-  events: [demoRecord],
-  activeEventId: demoRecord.id,
+  events: [],
+  activeEventId: "",
   draftEvent: null,
   scheduleOrigin: "invite",
   scheduleReturn: "create",
-  accountPrefs: { notifications: false, notifyStatus: true, notifyShifts: true, notifyTeam: true, calendar: false, emailUpdates: false },
+  accountPrefs: { notifications: false, notifyStatus: true, notifyShifts: true, notifyTeam: true, notifyChanges: true, calendar: false, emailUpdates: false },
   theme: "system",
   scheduleView: "list",
+  currentUser: null,
+  authReady: false,
+  authBusy: false,
   setTheme: (theme) => set({ theme }),
   setScheduleView: (scheduleView) => set({ scheduleView }),
+  setCurrentUser: (currentUser) => set({ currentUser }),
+  setAuthReady: (authReady) => set({ authReady }),
+  setAuthBusy: (authBusy) => set({ authBusy }),
+  replaceEvents: (events, activeEventId) => set((state) => ({
+    events,
+    activeEventId: activeEventId && events.some((e) => e.id === activeEventId)
+      ? activeEventId
+      : events[0]?.id ?? "",
+    selectedMemberId: state.selectedMemberId || events[0]?.organizer.id || "",
+  })),
+  upsertRemoteEvent: (record) => set((state) => {
+    const exists = state.events.some((event) => event.id === record.id);
+    const events = exists ? state.events.map((event) => event.id === record.id ? record : event) : [...state.events, record];
+    return {
+      events,
+      activeEventId: state.activeEventId || record.id,
+      selectedMemberId: state.selectedMemberId || record.organizer.id,
+    };
+  }),
+  clearSession: () => set({
+    currentUser: null,
+    events: [],
+    activeEventId: "",
+    draftEvent: null,
+    screen: "auth",
+    sheet: null,
+    selectedMemberId: "",
+    joined: false,
+  }),
   shelveDraft: () => set((state) => state.draftEvent ? { screen: "hub", sheet: null, notice: "Черновик сохранён" } : { screen: "hub", sheet: null }),
   resumeCreate: () => {
     if (useEmbersStore.getState().draftEvent) set({ screen: "create", sheet: null });
@@ -434,21 +579,45 @@ export const useEmbersStore = create<Store>((set) => ({
       : events.find((event) => onBoard(event, now))?.id ?? events[0]?.id ?? state.activeEventId;
     return { events, activeEventId };
   }),
-  updateMyStatus: (myStatus) => set((state) => ({ ...withFocus(state, (event) => ({ ...event, myStatus })), sheet: null })),
+  updateMyStatus: (myStatus) => set((state) => {
+    const next = { ...withFocus(state, (event) => ({ ...event, myStatus })), sheet: null };
+    const uid = state.currentUser?.uid;
+    if (uid && remoteEnabled(state)) {
+      const event = focusedEvent(state);
+      void updateMemberFields(event.id, uid, { myStatus, status: myStatus }).catch(() => undefined);
+      void postActivity(event.id, uid, "team", `Статус: ${myStatus}`).catch(() => undefined);
+    }
+    return next;
+  }),
   filterTeam: (teamFilter) => set({ teamFilter }),
-  toggleShareLocation: () => set((state) => withFocus(state, (event) => ({ ...event, shareLocation: !event.shareLocation }))),
+  toggleShareLocation: () => set((state) => {
+    const event = focusedEvent(state);
+    const shareLocation = !event.shareLocation;
+    const uid = state.currentUser?.uid;
+    if (uid && remoteEnabled(state)) void updateMemberFields(event.id, uid, { shareLocation }).catch(() => undefined);
+    return withFocus(state, (item) => ({ ...item, shareLocation }));
+  }),
   setJoinCode: (code) => set({ joinCode: code.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6), joinError: "" }),
   setJoinRole: (joinRole) => set({ joinRole }),
   addOpenRole: (role) => set((state) => {
     const name = role.trim();
     const current = focusedEvent(state);
+    if (!viewerCan({ currentUser: state.currentUser, event: current }, "manageTeam") && remoteEnabled(state)) {
+      return { notice: "Нет права управлять командой" };
+    }
     if (!name || current.openRoles.some((item) => item.toLowerCase() === name.toLowerCase())) return state;
-    return withFocus(state, (event) => ({ ...event, openRoles: [...event.openRoles, name] }));
+    const openRoles = [...current.openRoles, name];
+    const next = withFocus(state, (event) => ({ ...event, openRoles }));
+    syncEventMeta({ ...state, ...next } as Store, { openRoles }, { kind: "team", text: `Открыта роль «${name}»` });
+    return next;
   }),
   addTeamMember: (name, role) => set((state) => {
     const person = name.trim().replace(/\s+/g, " ");
     if (person.length < 2) return { notice: "Введите имя участника" };
     const current = focusedEvent(state);
+    if (!viewerCan({ currentUser: state.currentUser, event: current }, "manageTeam") && remoteEnabled(state)) {
+      return { notice: "Нет права управлять командой" };
+    }
     const job = role.trim() || "Участник";
     const id = `member-${Date.now()}`;
     const colors = ["#3B82F6", "#06B6D4", "#EF4444", "#10B981", "#8B5CF6", "#F59E0B", "#EC4899", "#FF6B00"];
@@ -470,23 +639,36 @@ export const useEmbersStore = create<Store>((set) => ({
       phone: "",
       coords: pins[current.team.length % pins.length],
     };
-    return withFocus(state, (event) => ({
+    const openRoles = current.openRoles.filter((item) => item.toLowerCase() !== job.toLowerCase());
+    const next = withFocus(state, (event) => ({
       ...event,
       team: [...event.team, member],
       schedules: { ...event.schedules, [id]: [] },
       memberRoles: { ...event.memberRoles, [id]: job },
-      openRoles: event.openRoles.filter((item) => item.toLowerCase() !== job.toLowerCase()),
+      permissions: { ...event.permissions, [id]: noPermissions() },
+      openRoles,
     }));
+    if (remoteEnabled(state)) {
+      const doc: MemberDoc = { ...member, isOwner: false, permissions: noPermissions(), shareLocation: true, myStatus: "gathering" };
+      void pushMember(current.id, doc).catch(() => undefined);
+      void pushSchedule(current.id, id, []).catch(() => undefined);
+      syncEventMeta({ ...state, ...next } as Store, { openRoles }, { kind: "team", text: `В команду добавлен ${person}` });
+    }
+    return next;
   }),
   setProfilePhone: (profilePhone) => set({ profilePhone }),
   setNotice: (notice) => set({ notice }),
   joinByCode: (code) => {
-    const value = (code ?? useEmbersStore.getState().joinCode).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+    const value = (code ?? get().joinCode).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
     if (!joinCodeSchema.safeParse(value).success) {
       set({ joinCode: value, joinError: "Введите 6 символов" });
       return false;
     }
-    const found = useEmbersStore.getState().events.find((event) => event.code === value);
+    if (get().currentUser) {
+      void get().joinEventRemote(value);
+      return true;
+    }
+    const found = get().events.find((event) => event.code === value);
     if (!found) {
       set({ joinError: "Событие с таким кодом не найдено" });
       return false;
@@ -494,27 +676,64 @@ export const useEmbersStore = create<Store>((set) => ({
     set({ joined: true, joinError: "", sheet: null, screen: "live", activeEventId: found.id });
     return true;
   },
+  joinEventRemote: async (code) => {
+    const state = get();
+    const value = (code ?? state.joinCode).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+    if (!joinCodeSchema.safeParse(value).success) {
+      set({ joinCode: value, joinError: "Введите 6 символов" });
+      return false;
+    }
+    if (!state.currentUser) {
+      set({ joinError: "Сначала войдите в аккаунт" });
+      return false;
+    }
+    set({ authBusy: true, joinError: "" });
+    try {
+      const result = await joinEventByCode(state.currentUser, value, state.joinRole);
+      if (!result.ok) {
+        set({ joinError: result.error, authBusy: false });
+        return false;
+      }
+      set({ joined: true, joinError: "", sheet: null, screen: "live", activeEventId: result.eventId, authBusy: false });
+      return true;
+    } catch (error) {
+      set({ joinError: error instanceof Error ? error.message : "Не удалось присоединиться", authBusy: false });
+      return false;
+    }
+  },
   updateDraft: (patch) => set((state) => state.draftEvent ? { draftEvent: { ...state.draftEvent, details: { ...state.draftEvent.details, ...patch } } } : state),
   toggleAllDay: () => set((state) => state.draftEvent ? { draftEvent: { ...state.draftEvent, details: { ...state.draftEvent.details, allDay: !state.draftEvent.details.allDay } } } : state),
   createEvent: () => {
-    const draft = useEmbersStore.getState().draftEvent;
+    const draft = get().draftEvent;
+    const user = get().currentUser;
     if (!draft) return;
     if (!eventTitleSchema.safeParse(draft.details.title).success) { set({ notice: "Добавьте название события" }); return; }
     if (!draft.details.date) { set({ notice: "Выберите дату события" }); return; }
     if (!draft.details.venue) { set({ notice: "Выберите локацию" }); return; }
     set((state) => ({ events: [...state.events, draft], activeEventId: draft.id, draftEvent: null, screen: "hub", sheet: null }));
+    if (user) {
+      void createEventRemote(user, draft).catch((error) => {
+        set({ notice: error instanceof Error ? error.message : "Не удалось сохранить событие" });
+      });
+    }
   },
   startCreate: () => set((state) => {
     const taken = state.events.map((event) => event.code);
     let code = eventCode();
     while (taken.includes(code)) code = eventCode();
-    return { screen: "create", sheet: null, draftEvent: blankRecord(code) };
+    const draft = blankRecord(code, state.currentUser);
+    return { screen: "create", sheet: null, draftEvent: draft, selectedMemberId: draft.organizer.id };
   }),
-  addScheduleBlock: (location) => useEmbersStore.getState().insertScheduleBlock(location, Number.MAX_SAFE_INTEGER),
+  addScheduleBlock: (location) => get().insertScheduleBlock(location, Number.MAX_SAFE_INTEGER),
   insertScheduleBlock: (location, index) => set((state) => {
     const name = location.trim();
     if (!name) return state;
-    const current = focusedEvent(state).schedules[state.selectedMemberId] ?? [];
+    const event = focusedEvent(state);
+    if (!viewerCan({ currentUser: state.currentUser, event }, "editSchedule") && remoteEnabled(state)) {
+      return { notice: "Нет права редактировать расписание" };
+    }
+    const memberId = state.selectedMemberId || event.organizer.id;
+    const current = event.schedules[memberId] ?? [];
     const at = Math.max(0, Math.min(index, current.length));
     const next = [...current];
     next.splice(at, 0, {
@@ -525,54 +744,111 @@ export const useEmbersStore = create<Store>((set) => ({
       travel: 10,
       color: ["#FF5A1F", "#3B82F6", "#A855F7", "#10B981"][current.length % 4],
     });
-    return withFocus(state, (event) => ({ ...event, schedules: { ...event.schedules, [state.selectedMemberId]: next } }));
+    const patch = withFocus(state, (item) => ({ ...item, schedules: { ...item.schedules, [memberId]: next } }));
+    const merged = { ...state, ...patch } as Store;
+    syncSchedule(merged, memberId);
+    if (state.currentUser) void postActivity(event.id, state.currentUser.uid, "schedule", `Обновлено расписание`).catch(() => undefined);
+    return patch;
   }),
   reorderScheduleBlocks: (blocks) => set((state) => {
-    const current = focusedEvent(state).schedules[state.selectedMemberId] ?? [];
+    const memberId = state.selectedMemberId;
+    const current = focusedEvent(state).schedules[memberId] ?? [];
     const ids = new Set(current.map((block) => block.id));
     if (blocks.length !== current.length || blocks.some((block) => !ids.has(block.id))) return state;
-    return withFocus(state, (event) => ({ ...event, schedules: { ...event.schedules, [state.selectedMemberId]: blocks } }));
+    const patch = withFocus(state, (event) => ({ ...event, schedules: { ...event.schedules, [memberId]: blocks } }));
+    syncSchedule({ ...state, ...patch } as Store, memberId);
+    return patch;
   }),
-  removeScheduleBlock: (id) => set((state) => withFocus(state, (event) => ({
-    ...event,
-    schedules: { ...event.schedules, [state.selectedMemberId]: (event.schedules[state.selectedMemberId] ?? []).filter((block) => block.id !== id) },
-  }))),
+  removeScheduleBlock: (id) => set((state) => {
+    const memberId = state.selectedMemberId;
+    const patch = withFocus(state, (event) => ({
+      ...event,
+      schedules: { ...event.schedules, [memberId]: (event.schedules[memberId] ?? []).filter((block) => block.id !== id) },
+    }));
+    syncSchedule({ ...state, ...patch } as Store, memberId);
+    return patch;
+  }),
   updateScheduleBlock: (id, patch) => set((state) => {
+    const memberId = state.selectedMemberId;
     const task = patch.task?.trim();
     const time = patch.time?.trim();
     const travel = typeof patch.travel === "number" && patch.travel >= 0 ? Math.min(240, Math.round(patch.travel)) : undefined;
-    return withFocus(state, (event) => ({
+    const next = withFocus(state, (event) => ({
       ...event,
-      schedules: { ...event.schedules, [state.selectedMemberId]: (event.schedules[state.selectedMemberId] ?? []).map((block) => block.id === id ? { ...block, ...(task ? { task } : {}), ...(time ? { time } : {}), ...(travel !== undefined ? { travel } : {}) } : block) },
+      schedules: { ...event.schedules, [memberId]: (event.schedules[memberId] ?? []).map((block) => block.id === id ? { ...block, ...(task ? { task } : {}), ...(time ? { time } : {}), ...(travel !== undefined ? { travel } : {}) } : block) },
     }));
+    syncSchedule({ ...state, ...next } as Store, memberId);
+    if (state.currentUser && (task || time)) {
+      void postActivity(focusedEvent(state).id, state.currentUser.uid, "schedule", task ? "Обновлена задача" : "Обновлено время").catch(() => undefined);
+    }
+    return next;
   }),
   openSchedule: (memberId, origin = "invite") => set((state) => ({ selectedMemberId: memberId, screen: "schedule", sheet: null, scheduleOrigin: origin, scheduleReturn: state.screen === "live" ? "live" : "create" })),
   setMemberRole: (id, role) => set((state) => {
     const name = role.trim();
     if (!name) return state;
-    return withFocus(state, (event) => ({ ...event, memberRoles: { ...event.memberRoles, [id]: name } }));
+    const event = focusedEvent(state);
+    const patch = withFocus(state, (item) => ({
+      ...item,
+      memberRoles: { ...item.memberRoles, [id]: name },
+      team: item.team.map((member) => member.id === id ? { ...member, role: name } : member),
+      organizer: item.organizer.id === id ? { ...item.organizer, role: name } : item.organizer,
+    }));
+    if (remoteEnabled(state)) void updateMemberFields(event.id, id, { role: name }).catch(() => undefined);
+    return patch;
   }),
-  addProgramFile: (file) => set((state) => withFocus(state, (event) => ({ ...event, programFiles: [...event.programFiles, file] }))),
-  removeProgramFile: (id) => set((state) => withFocus(state, (event) => ({ ...event, programFiles: event.programFiles.filter((file) => file.id !== id) }))),
+  setMemberPermissions: (memberId, permissions) => set((state) => {
+    const event = focusedEvent(state);
+    if (event.ownerId !== state.currentUser?.uid) return { notice: "Только организатор выдаёт права" };
+    if (memberId === event.ownerId) return state;
+    const patch = withFocus(state, (item) => ({ ...item, permissions: { ...item.permissions, [memberId]: permissions } }));
+    if (remoteEnabled(state)) void updateMemberPermissions(event.id, memberId, permissions).catch(() => undefined);
+    return { ...patch, notice: "Права обновлены" };
+  }),
+  addProgramFile: (file) => set((state) => {
+    const event = focusedEvent(state);
+    if (!viewerCan({ currentUser: state.currentUser, event }, "manageFiles") && remoteEnabled(state)) return { notice: "Нет права управлять файлами" };
+    const programFiles = [...event.programFiles, file];
+    const patch = withFocus(state, (item) => ({ ...item, programFiles }));
+    syncEventMeta({ ...state, ...patch } as Store, { programFiles }, { kind: "files", text: `Добавлен файл «${file.name}»` });
+    return patch;
+  }),
+  removeProgramFile: (id) => set((state) => {
+    const event = focusedEvent(state);
+    const programFiles = event.programFiles.filter((file) => file.id !== id);
+    const patch = withFocus(state, (item) => ({ ...item, programFiles }));
+    syncEventMeta({ ...state, ...patch } as Store, { programFiles }, { kind: "files", text: "Файл удалён из программы" });
+    return patch;
+  }),
   addLocationGroup: (name) => set((state) => {
     const title = name.trim();
-    const groups = focusedEvent(state).locationGroups;
+    const event = focusedEvent(state);
+    if (!viewerCan({ currentUser: state.currentUser, event }, "manageLocations") && remoteEnabled(state)) return { notice: "Нет права управлять локациями" };
     if (!title) return state;
-    if (groups.some((group) => group.name.toLowerCase() === title.toLowerCase())) return { notice: "Такая группа уже есть" };
-    return withFocus(state, (event) => ({ ...event, locationGroups: [...event.locationGroups, { name: title, locations: [] }] }));
+    if (event.locationGroups.some((group) => group.name.toLowerCase() === title.toLowerCase())) return { notice: "Такая группа уже есть" };
+    const locationGroups = [...event.locationGroups, { name: title, locations: [] }];
+    const patch = withFocus(state, (item) => ({ ...item, locationGroups }));
+    syncEventMeta({ ...state, ...patch } as Store, { locationGroups }, { kind: "locations", text: `Добавлена группа «${title}»` });
+    return patch;
   }),
-  removeLocationGroup: (name) => set((state) => withFocus(state, (event) => ({ ...event, locationGroups: event.locationGroups.filter((group) => group.name !== name) }))),
+  removeLocationGroup: (name) => set((state) => {
+    const event = focusedEvent(state);
+    const locationGroups = event.locationGroups.filter((group) => group.name !== name);
+    const patch = withFocus(state, (item) => ({ ...item, locationGroups }));
+    syncEventMeta({ ...state, ...patch } as Store, { locationGroups });
+    return patch;
+  }),
   addPresetLocation: (group, name) => set((state) => {
     const title = name.trim();
-    const groups = focusedEvent(state).locationGroups;
+    const event = focusedEvent(state);
     if (!title) return state;
-    const current = groups.find((item) => item.name === group);
+    const current = event.locationGroups.find((item) => item.name === group);
     if (!current) return state;
     if (current.locations.some((location) => location.name.toLowerCase() === title.toLowerCase())) return { notice: "Такая локация уже есть" };
-    return withFocus(state, (event) => ({
-      ...event,
-      locationGroups: event.locationGroups.map((item) => item.name === group ? { ...item, locations: [...item.locations, { id: `preset-${Date.now()}`, name: title, color: presetColors[item.locations.length % presetColors.length], icon: "sparkles" as const }] } : item),
-    }));
+    const locationGroups = event.locationGroups.map((item) => item.name === group ? { ...item, locations: [...item.locations, { id: `preset-${Date.now()}`, name: title, color: presetColors[item.locations.length % presetColors.length], icon: "sparkles" as const }] } : item);
+    const patch = withFocus(state, (item) => ({ ...item, locationGroups }));
+    syncEventMeta({ ...state, ...patch } as Store, { locationGroups }, { kind: "locations", text: `Добавлена локация «${title}»` });
+    return patch;
   }),
   updatePresetLocation: (id, patch) => set((state) => {
     const groups = focusedEvent(state).locationGroups;
@@ -583,19 +859,21 @@ export const useEmbersStore = create<Store>((set) => ({
     if (!groups.some((group) => group.name === nextGroup)) return state;
     const icon = patch.icon && locationIconNames.includes(patch.icon) ? patch.icon : current.icon;
     const updated = { ...current, color: patch.color || current.color, icon };
-    return withFocus(state, (event) => ({
-      ...event,
-      locationGroups: event.locationGroups.map((group) => {
-        if (source.name === nextGroup && group.name === source.name) return { ...group, locations: group.locations.map((location) => location.id === id ? updated : location) };
-        if (group.name === source.name) return { ...group, locations: group.locations.filter((location) => location.id !== id) };
-        if (group.name === nextGroup) return { ...group, locations: [...group.locations, updated] };
-        return group;
-      }),
-    }));
+    const locationGroups = groups.map((group) => {
+      if (source.name === nextGroup && group.name === source.name) return { ...group, locations: group.locations.map((location) => location.id === id ? updated : location) };
+      if (group.name === source.name) return { ...group, locations: group.locations.filter((location) => location.id !== id) };
+      if (group.name === nextGroup) return { ...group, locations: [...group.locations, updated] };
+      return group;
+    });
+    const next = withFocus(state, (event) => ({ ...event, locationGroups }));
+    syncEventMeta({ ...state, ...next } as Store, { locationGroups });
+    return next;
   }),
-  removePresetLocation: (group, id) => set((state) => withFocus(state, (event) => ({
-    ...event,
-    locationGroups: event.locationGroups.map((item) => item.name === group ? { ...item, locations: item.locations.filter((location) => location.id !== id) } : item),
-  }))),
+  removePresetLocation: (group, id) => set((state) => {
+    const locationGroups = focusedEvent(state).locationGroups.map((item) => item.name === group ? { ...item, locations: item.locations.filter((location) => location.id !== id) } : item);
+    const patch = withFocus(state, (event) => ({ ...event, locationGroups }));
+    syncEventMeta({ ...state, ...patch } as Store, { locationGroups });
+    return patch;
+  }),
   setAccountPref: (key, value) => set((state) => ({ accountPrefs: { ...state.accountPrefs, [key]: value } })),
 }));
