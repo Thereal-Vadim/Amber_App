@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "sportai-9e337"
-  }
+    "default": "amber-events-app"
+  },
+  "targets": {},
+  "etags": {}
 }

@@ -6,13 +6,12 @@ import { getFirestore, type Firestore } from "firebase/firestore";
 import { getMessaging, isSupported, type Messaging } from "firebase/messaging";
 
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? "AIzaSyBuc_U0aSabJUMYfZv8ysv462xOBA3hWJg",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? "sportai-9e337.firebaseapp.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? "sportai-9e337",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? "sportai-9e337.firebasestorage.app",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? "409254404219",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ?? "1:409254404219:web:5d5cf04f5aaf66df0a82de",
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID ?? "G-N23XHB00SQ",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? "AIzaSyDy9qQW4CfaaYqhOEJSm7USckJAir2fQBE",
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? "amber-events-app.firebaseapp.com",
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? "amber-events-app",
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? "amber-events-app.firebasestorage.app",
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? "452141028475",
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ?? "1:452141028475:web:6cdcee1eff8434fd3f3ede",
 };
 
 let app: FirebaseApp | undefined;
